@@ -105,10 +105,11 @@ void nvbit_at_init() {
     
     if (record) {
         myfile = fopen("/home/omiles/example.txt", "w");
+        printf("Hello world\n");
     } else {
         myfile = fopen("/home/omiles/example.txt", "r");
+        printf("Hello world\n");
     }
-    
 
     /* just make sure all managed variables are allocated on GPU */
     setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
@@ -194,19 +195,48 @@ void nvbit_at_function_first_load(CUcontext ctx, CUfunction func) {
  * */
 void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
                          const char *name, void *params, CUresult *pStatus) {
+
+    printf("Id: %d\n", cbid);
     if (is_exit) {
         if (cbid == API_CUDA_cuMemAlloc_v2) {
+            
+            CUdeviceptr buff = 0UL;
+            size_t buff_size = (1UL << 30);
+
+            CUDAAPI::CUmemLocation oop;
+            oop.type = CUDAAPI::CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE;
+            oop.id = 0;
+
+            CUDAAPI::CUmemAccessDesc halp;
+            halp.location = oop;
+            halp.flags = CUDAAPI::CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+            CUresult r = CUDAAPI::cuMemSetAccess(buff, buff_size, &halp, 1);
+            printf("Result: %d\n", r);
+
             cuMemAlloc_v2_params *p = (cuMemAlloc_v2_params *)params;
             if (record) {
                 printf("Saving: %llu\n", *(p->dptr));
                 fprintf(myfile, "%llu\n", *(p->dptr));
             } else {
                 fscanf(myfile,"%llu", p->dptr);
+                // CUDAAPI::CUmemLocation oop;
+                // oop.type = CUDAAPI::CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE;
+                // oop.id = 0;
+
+
+                // CUDAAPI::CUmemAccessDesc halp;
+                // halp.location = oop;
+                // halp.flags = CUDAAPI::CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+                // // CUDAAPI::CUmemLocation oop = {CUDAAPI::CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE, 1};
+                // // CUDAAPI::CUmemAccessDesc halp = {oop, CUDAAPI::CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE};
+                // CUresult r = CUDAAPI::cuMemSetAccess(*(p->dptr), p->bytesize, &halp, 1);
+                // printf("Result: %d\n", r);
+                // printf("Buffer: %d\n", p->bytesize);
             }
             return;
         }
     } else {
-        printf("%d\n", ctx.get_limit());
+        // printf("%d\n", ctx.get_limit());
         if (cbid == API_CUDA_cuMemcpyHtoD_v2) {
             cuMemcpyHtoD_v2_ptds_params *p = (cuMemcpyHtoD_v2_ptds_params *)params;
             printf("Trying to copy: %llu\n", p->dstDevice);
@@ -214,51 +244,51 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
     }
 
 
-    /* Identify all the possible CUDA launch events */
-    if (cbid == API_CUDA_cuLaunch || cbid == API_CUDA_cuLaunchKernel_ptsz ||
-        cbid == API_CUDA_cuLaunchGrid || cbid == API_CUDA_cuLaunchGridAsync ||
-        cbid == API_CUDA_cuLaunchKernel) {
-        /* cast params to cuLaunch_params since if we are here we know these are
-         * the right parameters type */
-        cuLaunch_params *p = (cuLaunch_params *)params;
+    // /* Identify all the possible CUDA launch events */
+    // if (cbid == API_CUDA_cuLaunch || cbid == API_CUDA_cuLaunchKernel_ptsz ||
+    //     cbid == API_CUDA_cuLaunchGrid || cbid == API_CUDA_cuLaunchGridAsync ||
+    //     cbid == API_CUDA_cuLaunchKernel) {
+    //     /* cast params to cuLaunch_params since if we are here we know these are
+    //      * the right parameters type */
+    //     cuLaunch_params *p = (cuLaunch_params *)params;
 
-        if (!is_exit) {
-            /* if we are entering in a kernel launch:
-             * 1. Lock the mutex to prevent multiple kernels to run concurrently
-             * (overriding the counter) in case the user application does that
-             * 2. Select if we want to run the instrumented or original
-             * version of the kernel
-             * 3. Reset the kernel instruction counter */
+    //     if (!is_exit) {
+    //         /* if we are entering in a kernel launch:
+    //          * 1. Lock the mutex to prevent multiple kernels to run concurrently
+    //          * (overriding the counter) in case the user application does that
+    //          * 2. Select if we want to run the instrumented or original
+    //          * version of the kernel
+    //          * 3. Reset the kernel instruction counter */
 
-            pthread_mutex_lock(&mutex);
-            if (kernel_id >= ker_begin_interval &&
-                kernel_id < ker_end_interval) {
-                nvbit_enable_instrumented(ctx, p->f, true);
-            } else {
-                nvbit_enable_instrumented(ctx, p->f, false);
-            }
-            counter = 0;
-        } else {
-            /* if we are exiting a kernel launch:
-             * 1. Wait until the kernel is completed using
-             * cudaDeviceSynchronize()
-             * 2. Get number of thread blocks in the kernel
-             * 3. Print the thread instruction counters
-             * 4. Release the lock*/
-            CUDA_SAFECALL(cudaDeviceSynchronize());
-            tot_app_instrs += counter;
-            int num_ctas = 0;
-            if (cbid == API_CUDA_cuLaunchKernel_ptsz ||
-                cbid == API_CUDA_cuLaunchKernel) {
-                cuLaunchKernel_params *p2 = (cuLaunchKernel_params *)params;
-                num_ctas = p2->gridDimX * p2->gridDimY * p2->gridDimZ;
-            }
-            printf(
-                "kernel %d - %s - #thread-blocks %d,  kernel "
-                "instructions %ld, total instructions %ld\n",
-                kernel_id++, nvbit_get_func_name(ctx, p->f), num_ctas, counter,
-                tot_app_instrs);
-            pthread_mutex_unlock(&mutex);
-        }
-    }
+    //         pthread_mutex_lock(&mutex);
+    //         if (kernel_id >= ker_begin_interval &&
+    //             kernel_id < ker_end_interval) {
+    //             nvbit_enable_instrumented(ctx, p->f, true);
+    //         } else {
+    //             nvbit_enable_instrumented(ctx, p->f, false);
+    //         }
+    //         counter = 0;
+    //     } else {
+    //         /* if we are exiting a kernel launch:
+    //          * 1. Wait until the kernel is completed using
+    //          * cudaDeviceSynchronize()
+    //          * 2. Get number of thread blocks in the kernel
+    //          * 3. Print the thread instruction counters
+    //          * 4. Release the lock*/
+    //         CUDA_SAFECALL(cudaDeviceSynchronize());
+    //         tot_app_instrs += counter;
+    //         int num_ctas = 0;
+    //         if (cbid == API_CUDA_cuLaunchKernel_ptsz ||
+    //             cbid == API_CUDA_cuLaunchKernel) {
+    //             cuLaunchKernel_params *p2 = (cuLaunchKernel_params *)params;
+    //             num_ctas = p2->gridDimX * p2->gridDimY * p2->gridDimZ;
+    //         }
+    //         printf(
+    //             "kernel %d - %s - #thread-blocks %d,  kernel "
+    //             "instructions %ld, total instructions %ld\n",
+    //             kernel_id++, nvbit_get_func_name(ctx, p->f), num_ctas, counter,
+    //             tot_app_instrs);
+    //         pthread_mutex_unlock(&mutex);
+    //     }
+    // }
 }

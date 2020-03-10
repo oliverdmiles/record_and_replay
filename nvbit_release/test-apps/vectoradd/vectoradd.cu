@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "cuda.h"
 
 #define CUDA_SAFECALL(call)                                                 \
     {                                                                       \
@@ -43,7 +44,10 @@ int main(int argc, char *argv[]) {
     // Device output vector
     double *d_c;
 
-
+    size_t freet;
+    size_t total;
+    cudaMemGetInfo(&freet, &total);
+    printf("Free: %llu Total: %llu\n", freet, total);
     // Size, in bytes, of each vector
     size_t bytes = n * sizeof(double);
 

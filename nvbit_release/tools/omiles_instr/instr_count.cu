@@ -94,6 +94,8 @@ extern "C" __device__ __noinline__ void count_instrs(int predicate,
     int warp_ID = get_global_warp_id(); 
     //if (smid == 1 && blockID == 1 && warp_ID <= 608) printf("tid %d : lid %d : smid %d : bid %d : wid %d \n", threadID, lane_id, smid, blockID, warp_ID);
     if (first_laneid == laneid) {
+        if(warp_ID > 99990) {
+        }
         if (count_warp_level) {
             /* num threads can be zero when accounting for predicates off */
             if (num_threads > 0) atomicAdd((unsigned long long *)&counter, 1);
@@ -103,6 +105,20 @@ extern "C" __device__ __noinline__ void count_instrs(int predicate,
     }
 }
 NVBIT_EXPORT_FUNC(count_instrs);
+
+void nvbit_at_ctx_init(CUcontext ctx) {
+    printf("Hi...\n");
+    CUdeviceptr test;
+    uint bytesize = 128;
+    CUresult temp = cuMemAlloc_v2(&test, bytesize);
+    printf("Here:%llu\n", temp);
+    CUdeviceptr_v1 pbase;
+    uint psize;
+    printf("Pointer: %llu\n", test);
+    CUresult tem1 = cuMemGetAddressRange(&pbase, &psize, test);
+    printf("%d\n", tem1);
+    printf("pbase: %llu psize: %llu dptr: %llu\n", pbase, psize, test); 
+}
 
 /* nvbit_at_init() is executed as soon as the nvbit tool is loaded. We typically
  * do initializations in this call. In this case for instance we get some
@@ -192,7 +208,30 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
                          const char *name, void *params, CUresult *pStatus) {
     /* Identify all the possible CUDA launch events */
     static int count = 0;
+    static int count_htod = 0;
+    static CUdeviceptr_v1 arr[3];
+
     printf("%d: %d\n",count++, cbid);
+    if (cbid == 276 && is_exit) {
+        cuMemcpyHtoD_v2_params *p = (cuMemcpyHtoD_v2_params *)params;
+        CUdeviceptr_v1 dptr = (p->dstDevice);
+        printf("My dptr on %d: %llu\n", count_htod, dptr);
+        arr[count_htod++] = dptr;
+    }
+    if (cbid == 307 && !is_exit) {
+        printf("STARTING KERNEL\n");
+        for (int i = 0; i < 3; ++i) {
+            printf("dptr is: %llu\n", arr[i]);
+        }
+        for (int i = 0; i < 3; ++i) {
+            CUdeviceptr_v1 pbase;
+            uint psize;
+            printf("Pointer: %llu\n", arr[i]);
+            CUresult temp = cuMemGetAddressRange(&pbase, &psize, arr[i]);
+            printf("%d\n", temp);
+            printf("pbase: %llu psize: %llu dptr: %llu\n", pbase, psize, arr[i]);
+        }
+    }
 
     if (cbid == API_CUDA_cuLaunch || cbid == API_CUDA_cuLaunchKernel_ptsz ||
         cbid == API_CUDA_cuLaunchGrid || cbid == API_CUDA_cuLaunchGridAsync ||
