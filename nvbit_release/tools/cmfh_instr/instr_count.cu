@@ -111,6 +111,9 @@ void nvbit_at_init() {
         printf("Hello world\n");
     }
 
+    size_t lim;
+    cudaDeviceGetLimit(&lim, cudaLimit::cudaLimitStackSize);
+    printf("%d\n", lim);
     /* just make sure all managed variables are allocated on GPU */
     setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
 
@@ -199,26 +202,61 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
     printf("Id: %d\n", cbid);
     if (is_exit) {
         if (cbid == API_CUDA_cuMemAlloc_v2) {
-            
-            CUdeviceptr buff = 0UL;
-            size_t buff_size = (1UL << 30);
 
-            CUDAAPI::CUmemLocation oop;
-            oop.type = CUDAAPI::CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE;
+            CUmemLocation oop;
+            oop.type = CU_MEM_LOCATION_TYPE_DEVICE;
             oop.id = 0;
 
-            CUDAAPI::CUmemAccessDesc halp;
-            halp.location = oop;
-            halp.flags = CUDAAPI::CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-            CUresult r = CUDAAPI::cuMemSetAccess(buff, buff_size, &halp, 1);
-            printf("Result: %d\n", r);
-
             cuMemAlloc_v2_params *p = (cuMemAlloc_v2_params *)params;
+
+            unsigned long long f = 0;
+            CUresult r3 = cuMemGetAccess(&f, &oop, *(p->dptr));
+            printf("Result: %d\n", r3);
+            
+            // CUdeviceptr buff = 0UL;
+            // size_t buff_size = (1UL << 30);
+
+            // CUDAAPI::CUmemLocation oop;
+            // oop.type = CUDAAPI::CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE;
+            // oop.id = 0;
+
+            // CUDAAPI::CUmemAccessDesc halp;
+            // halp.location = oop;
+            // halp.flags = CUDAAPI::CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+            // printf("Flags type: %d\n", halp.flags);
+            // CUresult r = CUDAAPI::cuMemSetAccess(buff, buff_size, &halp, 1);
+            // printf("Result: %d\n", r);
+
+            // unsigned long long f;
+            // CUresult r3 = cuMemGetAccess (&f, &oop, buff);
+            // printf("Result: %d\n", r3);
+
+            // int device_count;
+            // CUresult r2 = CUDAAPI::cuDeviceGetCount(&device_count);
+            // printf("Result: %d\n", r2);
+            // printf("Device count: %d\n", device_count);
+
+            // cuMemAlloc_v2_params *p = (cuMemAlloc_v2_params *)params;
             if (record) {
                 printf("Saving: %llu\n", *(p->dptr));
                 fprintf(myfile, "%llu\n", *(p->dptr));
             } else {
-                fscanf(myfile,"%llu", p->dptr);
+                // fscanf(myfile,"%llu", p->dptr);
+
+
+                // CUDAAPI::CUmemLocation oop;
+                // oop.type = CUDAAPI::CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE;
+                // oop.id = 0;
+    
+    
+                // printf("Device pointer: %llu\n", *(p->dptr));
+                // unsigned long long f = 0;
+                // CUresult r3 = cuMemGetAccess(&f, &oop, *(p->dptr));
+                // printf("Result: %d\n", r3);
+
+
+
+
                 // CUDAAPI::CUmemLocation oop;
                 // oop.type = CUDAAPI::CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE;
                 // oop.id = 0;
@@ -240,6 +278,20 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
         if (cbid == API_CUDA_cuMemcpyHtoD_v2) {
             cuMemcpyHtoD_v2_ptds_params *p = (cuMemcpyHtoD_v2_ptds_params *)params;
             printf("Trying to copy: %llu\n", p->dstDevice);
+
+            // CUdeviceptr buff = 0UL;
+            // int N = 50000;
+            // size_t  size = N * sizeof(float);
+            // CUresult r4 = cuMemAddressReserve(&buff, size, size, 0, 0);
+            // printf("Result: %d\n", r4);
+
+            // CUmemLocation oop;
+            // oop.type = CU_MEM_LOCATION_TYPE_DEVICE;
+            // oop.id = 0;
+
+            // unsigned long long f = 0;
+            // CUresult r3 = cuMemGetAccess(&f, &oop, buff);
+            // printf("Result: %d\n", r3);
         }
     }
 

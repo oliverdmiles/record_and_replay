@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# run_record_replay
+#
+# Run a record and replay job automatically
+
+# Stop on errors, print commands
+# See https://vaneyckt.io/posts/safer_bash_scripts_with_set_euxo_pipefail/
+set -Eeuo pipefail
+
+if [[ "$#" -ne 1 ]]; then
+    echo "Illegal number of parameters"
+    exit 1
+fi
+
+
+CURRENT_DIR="$( pwd )"
+EXECUTABLE=$1
+FULL_EXEC=$CURRENT_DIR/$EXECUTABLE
+
+export CUDA_VISIBLE_DEVICES=1
+export LD_PRELOAD=/home/omiles/582/record_and_replay/nvbit_release/tools/cmfh_mem/cmfh_mem.so
+RECORD_REPLAY_PHASE=0 $FULL_EXEC
+
+export LD_PRELOAD=
+echo "This is where I would process the data"
+sleep 5
+
+
+export LD_PRELOAD=/home/omiles/582/record_and_replay/nvbit_release/tools/cmfh_mem/cmfh_mem.so
+RECORD_REPLAY_PHASE=1 $FULL_EXEC

@@ -1,34 +1,35 @@
 /* Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions
+* are met:
+*  * Redistributions of source code must retain the above copyright
+*    notice, this list of conditions and the following disclaimer.
+*  * Redistributions in binary form must reproduce the above copyright
+*    notice, this list of conditions and the following disclaimer in the
+*    documentation and/or other materials provided with the distribution.
+*  * Neither the name of NVIDIA CORPORATION nor the names of its
+*    contributors may be used to endorse or promote products derived
+*    from this software without specific prior written permission.
+*
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+* PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+* CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+* EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+* PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+* PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+* OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
 
 #include <assert.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
+#include<time.h>
 
 /* every tool needs to include this once */
 #include "nvbit_tool.h"
@@ -38,17 +39,39 @@
 
 /* nvbit utility functions */
 #include "utils/utils.h"
+#define WARP_SIZE 32
+
+
+
+__managed__ unsigned int * int_ptr;
+__managed__ unsigned int my_count;
+uint32_t state[10];
+
+__device__ uint32_t letmego(uint32_t threadID, uint32_t * address)
+{
+   unsigned long long int * address_as_ull =
+                              (unsigned long long int*)address;
+   unsigned long long int  old = *address_as_ull, assumed;
+
+    do {
+        assumed = threadID;
+        old = atomicCAS(address_as_ull, assumed, assumed+1);
+
+    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+    } while (assumed != old);
+    printf("%d\n", threadID);
+    return old;
+}
 
 /* kernel id counter, maintained in system memory */
 uint32_t kernel_id = 0;
 
 /* total instruction counter, maintained in system memory, incremented by
- * "counter" every time a kernel completes  */
+* "counter" every time a kernel completes  */
 uint64_t tot_app_instrs = 0;
 
 /* kernel instruction counter, updated by the GPU */
 __managed__ uint64_t counter = 0;
-
 /* global control variables for this tool */
 uint32_t instr_begin_interval = 0;
 uint32_t instr_end_interval = UINT32_MAX;
@@ -59,17 +82,18 @@ int count_warp_level = 1;
 int exclude_pred_off = 0;
 
 /* a pthread mutex, used to prevent multiple kernels to run concurrently and
- * therefore to "corrupt" the counter variable */
+* therefore to "corrupt" the counter variable */
 pthread_mutex_t mutex;
 
 /* instrumentation function that we want to inject, please note the use of
- * 1. "extern "C" __device__ __noinline__" to prevent code elimination by the
- * compiler.
- * 2. NVBIT_EXPORT_FUNC(count_instrs) to notify nvbit the name of the function
- * we want to inject. This name must match exactly the function name */
+* 1. "extern "C" __device__ __noinline__" to prevent code elimination by the
+* compiler.
+* 2. NVBIT_EXPORT_FUNC(count_instrs) to notify nvbit the name of the function
+* we want to inject. This name must match exactly the function name */
 extern "C" __device__ __noinline__ void count_instrs(int predicate,
-                                                     int count_warp_level) {
+                                                    int count_warp_level) {
     /* all the active threads will compute the active mask */
+    clock_t timer_start = clock();
     const int active_mask = __ballot(1);
     /* compute the predicate mask */
     const int predicate_mask = __ballot(predicate);
@@ -80,56 +104,50 @@ extern "C" __device__ __noinline__ void count_instrs(int predicate,
     /* count all the active thread */
     const int num_threads = __popc(predicate_mask);
     /* only the first active thread will perform the atomic */
-
+    
     /*
-        3d id gets us unique id regardless of structure
+    3d id gets us unique id regardless of structure
     */
-    int blockID = blockIdx.x + blockIdx.y * gridDim.x 
-                        + gridDim.x * gridDim.y * blockIdx.z;
-    int threadID = blockID * (blockDim.x * blockDim.y * blockDim.z) 
-                        + (threadIdx.z * (blockDim.x * blockDim.y)) 
-                        + (threadIdx.y * blockDim.x) + threadIdx.x;
-    int lane_id = get_laneid();
-    int smid = get_smid();
-    int warp_ID = get_global_warp_id(); 
-    //if (smid == 1 && blockID == 1 && warp_ID <= 608) printf("tid %d : lid %d : smid %d : bid %d : wid %d \n", threadID, lane_id, smid, blockID, warp_ID);
+    uint32_t blockID = blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
+    uint32_t threadID = blockID * (blockDim.x * blockDim.y * blockDim.z) + (threadIdx.z * (blockDim.x * blockDim.y)) + (threadIdx.y * blockDim.x) + threadIdx.x;
+    
+    //cudaDeviceSynchronize();
+    uint32_t lane_id = get_laneid();
+    
+    letmego(threadID, &my_count);
+
+    //__threadfence_system();
+    // if (lane_id == 0) {
+    //     mylock(lane_id);
+    //     printf("WHATS UP MY ID IS %d\n\n", lane_id);
+    //     myunlock(lane_id);
+    // }
     if (first_laneid == laneid) {
-        if(warp_ID > 99990) {
-        }
         if (count_warp_level) {
             /* num threads can be zero when accounting for predicates off */
             if (num_threads > 0) atomicAdd((unsigned long long *)&counter, 1);
         } else {
             atomicAdd((unsigned long long *)&counter, num_threads);
         }
+
     }
 }
 NVBIT_EXPORT_FUNC(count_instrs);
 
+
 void nvbit_at_ctx_init(CUcontext ctx) {
-    printf("Hi...\n");
-    CUdeviceptr test;
-    uint bytesize = 128;
-    CUresult temp = cuMemAlloc_v2(&test, bytesize);
-    printf("Here:%llu\n", temp);
-    CUdeviceptr_v1 pbase;
-    uint psize;
-    printf("Pointer: %llu\n", test);
-    CUresult tem1 = cuMemGetAddressRange(&pbase, &psize, test);
-    printf("%d\n", tem1);
-    printf("pbase: %llu psize: %llu dptr: %llu\n", pbase, psize, test); 
 }
 
 /* nvbit_at_init() is executed as soon as the nvbit tool is loaded. We typically
- * do initializations in this call. In this case for instance we get some
- * environment variables values which we use as input arguments to the tool */
+* do initializations in this call. In this case for instance we get some
+* environment variables values which we use as input arguments to the tool */
 void nvbit_at_init() {
     /* just make sure all managed variables are allocated on GPU */
     setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
 
     /* we get some environment variables that are going to be use to selectively
-     * instrument (within a interval of kernel indexes and instructions). By
-     * default we instrument everything. */
+    * instrument (within a interval of kernel indexes and instructions). By
+    * default we instrument everything. */
     GET_VAR_INT(
         instr_begin_interval, "INSTR_BEGIN", 0,
         "Beginning of the instruction interval where to apply instrumentation");
@@ -152,10 +170,10 @@ void nvbit_at_init() {
 }
 
 /* nvbit_at_function_first_load() is executed every time a function is loaded
- * for the first time. Inside this call-back we typically get the vector of SASS
- * instructions composing the loaded CUfunction. We can iterate on this vector
- * and insert call to instrumentation functions before or after each one of
- * them. */
+* for the first time. Inside this call-back we typically get the vector of SASS
+* instructions composing the loaded CUfunction. We can iterate on this vector
+* and insert call to instrumentation functions before or after each one of
+* them. */
 void nvbit_at_function_first_load(CUcontext ctx, CUfunction func) {
     /* Get the vector of instruction composing the loaded CUFunction "func" */
     const std::vector<Instr *> &instrs = nvbit_get_instrs(ctx, func);
@@ -165,13 +183,13 @@ void nvbit_at_function_first_load(CUcontext ctx, CUfunction func) {
         printf("inspecting %s - num instrs %ld\n",
                nvbit_get_func_name(ctx, func), instrs.size());
     }
-    int counter = 0;
+    
     /* We iterate on the vector of instruction */
     for (auto i : instrs) {
         /* Check if the instruction falls in the interval where we want to
          * instrument */
         if (i->getIdx() >= instr_begin_interval &&
-            i->getIdx() < instr_end_interval && counter == 22) {
+            i->getIdx() < instr_end_interval) {
             /* If verbose we print which instruction we are instrumenting (both
              * offset in the function and SASS string) */
             if (verbose == 1) {
@@ -194,30 +212,28 @@ void nvbit_at_function_first_load(CUcontext ctx, CUfunction func) {
             /* add count warps option */
             nvbit_add_call_arg_const_val32(i, count_warp_level);
         }
-        ++counter;
+        break;
     }
 }
 
 /* This call-back is triggered every time a CUDA driver call is encountered.
- * Here we can look for a particular CUDA driver call by checking at the
- * call back ids  which are defined in tools_cuda_api_meta.h.
- * This call back is triggered bith at entry and at exit of each CUDA driver
- * call, is_exit=0 is entry, is_exit=1 is exit.
- * */
+* Here we can look for a particular CUDA driver call by checking at the
+* call back ids  which are defined in tools_cuda_api_meta.h.
+* This call back is triggered bith at entry and at exit of each CUDA driver
+* call, is_exit=0 is entry, is_exit=1 is exit.
+* */
 void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
-                         const char *name, void *params, CUresult *pStatus) {
+                        const char *name, void *params, CUresult *pStatus) {
     /* Identify all the possible CUDA launch events */
-    static int count = 0;
-    static int count_htod = 0;
-    static CUdeviceptr_v1 arr[3];
-
-    printf("%d: %d\n",count++, cbid);
-    if (cbid == 276 && is_exit) {
-        cuMemcpyHtoD_v2_params *p = (cuMemcpyHtoD_v2_params *)params;
-        CUdeviceptr_v1 dptr = (p->dstDevice);
-        printf("My dptr on %d: %llu\n", count_htod, dptr);
-        arr[count_htod++] = dptr;
+    /*
+    if (cbid == 243 && is_exit) {
+        cuMemAlloc_v2_params *p = (cuMemAlloc_v2_params *)params;
+        CUdeviceptr * dptr = (p->dptr);
+        uint long size = p->bytesize;
+        printf("My dptr on %p: %llu\n", *dptr, size);
     }
+    */
+    /*
     if (cbid == 307 && !is_exit) {
         printf("STARTING KERNEL\n");
         for (int i = 0; i < 3; ++i) {
@@ -232,22 +248,23 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             printf("pbase: %llu psize: %llu dptr: %llu\n", pbase, psize, arr[i]);
         }
     }
+    */
 
     if (cbid == API_CUDA_cuLaunch || cbid == API_CUDA_cuLaunchKernel_ptsz ||
         cbid == API_CUDA_cuLaunchGrid || cbid == API_CUDA_cuLaunchGridAsync ||
         cbid == API_CUDA_cuLaunchKernel) {
         /* cast params to cuLaunch_params since if we are here we know these are
-         * the right parameters type */
+        * the right parameters type */
         cuLaunch_params *p = (cuLaunch_params *)params;
-        printf("func address: %d\n", nvbit_get_func_addr(p->f));
+        //printf("func address: %d\n", nvbit_get_func_addr(p->f));
 
         if (!is_exit) {
             /* if we are entering in a kernel launch:
-             * 1. Lock the mutex to prevent multiple kernels to run concurrently
-             * (overriding the counter) in case the user application does that
-             * 2. Select if we want to run the instrumented or original
-             * version of the kernel
-             * 3. Reset the kernel instruction counter */
+            * 1. Lock the mutex to prevent multiple kernels to run concurrently
+            * (overriding the counter) in case the user application does that
+            * 2. Select if we want to run the instrumented or original
+            * version of the kernel
+            * 3. Reset the kernel instruction counter */
 
             pthread_mutex_lock(&mutex);
             if (kernel_id >= ker_begin_interval &&
@@ -257,14 +274,20 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
                 nvbit_enable_instrumented(ctx, p->f, false);
             }
             counter = 0;
+            for (int i = 0; i < 10; ++i) {
+                state[i] = i+1000;
+            }
+            cudaMalloc((void***) &int_ptr, 10*sizeof(uint32_t));
+            cudaMemcpy(int_ptr, (void *)&state, 10*sizeof(uint32_t), cudaMemcpyHostToDevice);
         } else {
             /* if we are exiting a kernel launch:
-             * 1. Wait until the kernel is completed using
-             * cudaDeviceSynchronize()
-             * 2. Get number of thread blocks in the kernel
-             * 3. Print the thread instruction counters
-             * 4. Release the lock*/
+            * 1. Wait until the kernel is completed using
+            * cudaDeviceSynchronize()
+            * 2. Get number of thread blocks in the kernel
+            * 3. Print the thread instruction counters
+            * 4. Release the lock*/
             CUDA_SAFECALL(cudaDeviceSynchronize());
+            cudaFree(int_ptr);
             tot_app_instrs += counter;
             int num_ctas = 0;
             if (cbid == API_CUDA_cuLaunchKernel_ptsz ||
@@ -277,6 +300,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
                 "instructions %ld, total instructions %ld\n",
                 kernel_id++, nvbit_get_func_name(ctx, p->f), num_ctas, counter,
                 tot_app_instrs);
+            printf("total after all instructions = %d", my_count);
             pthread_mutex_unlock(&mutex);
         }
     }

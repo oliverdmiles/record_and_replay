@@ -3,6 +3,13 @@
 #include <stdlib.h>
 #include "cuda.h"
 
+/*
+pwd
+/home/omiles/582/record_and_replay/nvbit_release
+export LD_PRELOAD=tools/omiles_instr/omiles_instr.so 
+export CUDA_VISIBLE_DEVICES=1
+*/
+
 #define CUDA_SAFECALL(call)                                                 \
     {                                                                       \
         call;                                                               \
@@ -24,6 +31,7 @@ __global__ void vecAdd(double *a, double *b, double *c, int n) {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Make sure we do not go out of bounds
+    //if (id == 50) printf("Result: %f\n\n", a[id] + b[id]);
     if (id < n) c[id] = a[id] + b[id];
 }
 
@@ -43,11 +51,7 @@ int main(int argc, char *argv[]) {
     double *d_b;
     // Device output vector
     double *d_c;
-
-    size_t freet;
-    size_t total;
-    cudaMemGetInfo(&freet, &total);
-    printf("Free: %llu Total: %llu\n", freet, total);
+    
     // Size, in bytes, of each vector
     size_t bytes = n * sizeof(double);
 
@@ -60,14 +64,14 @@ int main(int argc, char *argv[]) {
     cudaMalloc(&d_a, bytes);
     cudaMalloc(&d_b, bytes);
     cudaMalloc(&d_c, bytes);
-    printf("addr a on dev: %llu\n", d_a);
-    printf("addr b on dev: %llu\n", d_b);
-    printf("addr c on dev: %llu\n", d_c);
-
+    printf("d_a = %p\n", d_a);
+    printf("d_b = %p\n", d_b);
+    printf("d_c = %p\n", d_c);
     int i;
     // Initialize vectors on host
     for (i = 0; i < n; i++) {
         h_a[i] = sin(i) * sin(i);
+        // if (i == 37) printf("h_a[37] = %f\n", h_a[i]);
         h_b[i] = cos(i) * cos(i);
         h_c[i] = 0;
     }
@@ -76,6 +80,7 @@ int main(int argc, char *argv[]) {
     cudaMemcpy(d_a, h_a, bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(d_b, h_b, bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(d_c, h_c, bytes, cudaMemcpyHostToDevice);
+    //printf("Result in vector add: %d\n", r3);
 
     int blockSize, gridSize;
 
