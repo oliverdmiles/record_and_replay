@@ -11,6 +11,7 @@ set -Eeuo pipefail
 usage() {
     echo 'USAGE: ./run.sh EXEC'
     echo '       EXEC          path to the executable to record and replay'
+    echo 'RUN setup.sh to disable ASLR if you care'
 }
 
 if [[ "$#" -ne 1 ]]; then
@@ -26,13 +27,10 @@ FULL_EXEC=$CURRENT_DIR/$EXECUTABLE
 
 export CUDA_VISIBLE_DEVICES=1
 export LD_PRELOAD=/home/omiles/582/record_and_replay/record_and_replay.so
-sudo bash -c 'echo 0 > /proc/sys/kernel/randomize_va_space'
 RECORD_REPLAY_PHASE=0 $FULL_EXEC
-
 
 export LD_PRELOAD=
 echo "This is where I would process the data"
-
 
 export LD_PRELOAD=/home/omiles/582/record_and_replay/record_and_replay.so
 RECORD_REPLAY_PHASE=1 $FULL_EXEC
