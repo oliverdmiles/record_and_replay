@@ -104,26 +104,26 @@ typedef struct {
 std::vector<record_data> accesses;
 
 /* array to access on memory */
-__managed__ int *deviceArr;
+__managed__ int **deviceArr;
 __managed__ int start = 0;
+__managed__ int NUM_METADATA = 3;
 
 __device__ uint32_t count = 0;
 __device__ int mutex = 0;
 
 __device__ void lock(int threadID) {
-  while (0 != (atomicCAS(&mutex, 0, 1))) {}
+  while (0 != (atomicCAS(&mutex, 0, 1))) {
+  }
 }
 
-__device__ void unlock(int threadID) {
-  atomicExch(&mutex, 0);
-}
+__device__ void unlock(int threadID) { atomicExch(&mutex, 0); }
 
 __device__ uint32_t get_TID() {
   uint32_t blockID =
       blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
   return blockID * (blockDim.x * blockDim.y * blockDim.z) +
-                      (threadIdx.z * (blockDim.x * blockDim.y)) +
-                      (threadIdx.y * blockDim.x) + threadIdx.x;
+         (threadIdx.z * (blockDim.x * blockDim.y)) +
+         (threadIdx.y * blockDim.x) + threadIdx.x;
 }
 
 /* Instrumentation function used to log memory accesses*/
@@ -202,22 +202,21 @@ extern "C" __device__ __noinline__ void mem_replay(int pred) {
 
   if (laneid == first_laneid) {
     lock(threadID);
-    printf("Looking at thread %d\n", threadID);
-    if (deviceArr[start + 1] != loc || false) {}
-
-    if (deviceArr[start + 2] == threadID) {
-      while (deviceArr[start + 1] > 1) {
+    int *currInterest = deviceArr[start];
+    if (currInterest[0] == loc || true) {
+      int curr_idx = currInterest[2];
+      while (currInterest[NUM_METADATA + curr_idx] != threadID) {
         unlock(threadID);
         lock(threadID);
+        curr_idx = currInterest[2];
       }
-      printf("The last thread id: %d\n", threadID);
-      start += 3;
+      printf("The thread being accessed is: %d\n", threadID);
+      currInterest[2] += 1;
 
-    } else {
-      printf("Not the last thread id: %d\n", threadID);
-      deviceArr[start + 1] -= 1;
+      if (currInterest[1] == currInterest[2]) {
+        start += 1;
+      }
     }
-
     unlock(threadID);
   }
 }
@@ -509,34 +508,38 @@ void nvbit_at_ctx_init(CUcontext ctx) {
     // fptr = fopen(filename.c_str(), "r");
     fptr = fopen("tester_output.txt", "r");
 
-    int Nrows = 3;
+    // Create host array of device pointers
     int Ncols;
     fscanf(fptr, "%d", &Ncols);
-    int* hostArr = new int[Ncols*Nrows];
-
-    cudaError_t mallocErr =
-        cudaMalloc((void **)&deviceArr, (Nrows * Ncols) * sizeof(int));
-    if (cudaSuccess != mallocErr) {
-      fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n", __FILE__,
-              __LINE__, cudaGetErrorString(mallocErr));
-      exit(EXIT_FAILURE);
-    }
+    int **hostArr = new int *[Ncols];
 
     for (int i = 0; i < Ncols; ++i) {
-      int addr, num_threads_total, last_thread;
-      fscanf(fptr, "%d %d %d", &addr, &num_threads_total, &last_thread);
-      hostArr[i] = addr;
-      hostArr[i + 1] = num_threads_total;
-      hostArr[i + 2] = last_thread;
+      int addr, num_threads;
+      fscanf(fptr, "%d %d", &addr, &num_threads);
+      int numSpots = num_threads + NUM_METADATA;
+      int *subArray = new int[numSpots];
+      subArray[0] = addr;
+      subArray[1] = num_threads;
+      subArray[2] = 0;
+
+      int curr_thread;
+      for (int j = 0; j < num_threads; ++j) {
+        fscanf(fptr, "%d", &curr_thread);
+        subArray[NUM_METADATA + j] = curr_thread;
+      }
+
+      CUDA_SAFECALL(cudaMalloc((void **)&hostArr[i], numSpots * sizeof(int)));
+      CUDA_SAFECALL(cudaMemcpy(hostArr[i], subArray, numSpots * sizeof(int),
+                               cudaMemcpyHostToDevice));
+
+      delete[] subArray;
     }
 
-    cudaError_t cpyErr = cudaMemcpy(deviceArr, hostArr, (Nrows * Ncols) * sizeof(int),
-                                    cudaMemcpyHostToDevice);
-    if (cudaSuccess != cpyErr) {
-      fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n", __FILE__,
-              __LINE__, cudaGetErrorString(cpyErr));
-      exit(EXIT_FAILURE);
-    }
+    // Copy to a device array of device pointers
+    CUDA_SAFECALL(cudaMalloc(&deviceArr, Ncols * sizeof(int *)));
+
+    CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr, Ncols * sizeof(int *),
+                             cudaMemcpyHostToDevice));
 
     delete[] hostArr;
 

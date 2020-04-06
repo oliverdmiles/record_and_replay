@@ -74,7 +74,33 @@ void read_file(char *filename) {
 }
 
 void find_dependencies() {
+	set<uint64_t> dependencies;
 	for (auto map_it = accs.begin(); map_it != accs.end(); map_it++) {
+		auto end = map_it->second.end();
+		bool read = false;
+		bool write = false;
+		for (auto it = map_it->second.begin(); it != end; it++) {
+			Access *curr = *it;
+			read = read || curr->load;
+			write = write || !curr->load;
+			if (read & write) {
+				dependencies.insert(map_it->first);
+				break;
+			}
+		}
+	}
+	cout << dependencies.size() << endl;
+
+	for (auto adds = dependencies.begin(); adds != dependencies.end(); adds++) {
+		cout << *adds;
+		auto end = accs[*adds].rend();
+		for (auto it = accs[*adds].rbegin(); it != end; it++) {
+			cout << " " << (*it)->thread_id;
+		}
+		cout << endl;
+	}
+
+	/*for (auto map_it = accs.begin(); map_it != accs.end(); map_it++) {
 		auto end = map_it->second.end();
 		//bool print = map_it->second.size() > 1;
 		string reads = "";
@@ -92,27 +118,6 @@ void find_dependencies() {
 			} else if (reads != "") {
 				writes += to_string(curr->thread_id) + " " + to_string(curr->value) + " ";
 			}
-
-			/*if (!curr->load && last_read) {
-				if (print) cout << "Found load after store" << endl;
-				found_write = true;
-				if (first_write) {
-					cout << "address: " << map_it->first << endl;
-					cout << "read: " << last_read->thread_id << " " << last_read->value;
-					cout << " write(s):";
-					first_write = false;
-				}
-				cout << " " << curr->thread_id << " " << curr->value;
-
-			} else if (curr->load) {
-				if (print) cout << "Found load" << endl;
-				first_write = true;
-				last_read = curr;
-				if (found_write) {
-					cout << endl;
-					found_write = false;
-				}
-			}*/
 		}
 		if (reads != "" && writes != "") {
 			cout << "address: " << map_it->first << endl;
@@ -120,7 +125,7 @@ void find_dependencies() {
 			reads = writes = "";
 		}
 
-	}
+	}*/
 	return;
 }
 
@@ -130,19 +135,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	read_file(argv[1]);
-
-	cout << "contents of map:" << endl;
-
-	for (auto it = accs.begin(); it != accs.end(); it++) {
-		if (it->second.size() > 1) {
-			cout << it->first << " " << it->second.size() << endl;
-			for (auto vec_it = it->second.begin(); vec_it != it->second.end(); vec_it++) {
-				cout << **vec_it << endl;
-				//cout << vec_it->thread_id << endl;
-			}
-		}
-	}
-
 	find_dependencies();
 
 	return 0;
