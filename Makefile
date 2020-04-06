@@ -16,10 +16,10 @@ NVBIT_TOOL=$(current_dir).so
 all: $(NVBIT_TOOL)
 
 $(NVBIT_TOOL): $(OBJECTS) $(NVBIT_PATH)/libnvbit.a
-	$(NVCC) -arch=sm_$(ARCH) -O3 $< $(LIBS) $(NVCC_PATH) -lcuda -lcudart_static -shared -o $@
+	$(NVCC) -arch=sm_$(ARCH) -O3 output/$< $(LIBS) $(NVCC_PATH) -lcuda -lcudart_static -shared -o output/$@
 
 %.o: %.cu
-	$(NVCC) -dc -c -std=c++11 $(INCLUDES) -Xptxas -cloning=no -maxrregcount=16 -Xcompiler -Wall -arch=sm_$(ARCH) -O3 -Xcompiler -fPIC $< -o $@
+	$(NVCC) -dc -c -std=c++11 $(INCLUDES) -Xptxas -cloning=no -maxrregcount=16 -Xcompiler -Wall -arch=sm_$(ARCH) -O3 -Xcompiler -fPIC $< -o output/$@
 
 clean:
-	rm -f *.so *.o
+	rm -f output/*.so output/*.o
