@@ -36,7 +36,7 @@ uint32_t instr_begin_interval = 0;
 uint32_t instr_end_interval = UINT32_MAX;
 int verbose = 0;
 int phase = 0;
-std::string filename = "recorded_data.txt";
+std::string record_file = "recorded_data.txt";
 FILE *fptr;
 
 /* information collected in the instrumentation function */
@@ -64,12 +64,19 @@ typedef struct {
 /* vector to store all accesses for a single kernel call  */
 std::vector<record_data> accesses;
 
-/* array to access on memory */
-__managed__ int **deviceArr;
-__managed__ int start = 0;
-__managed__ int NUM_METADATA = 3;
+/* map from replay files to the next index to be read */
+std::map<int, int> replay_files;
 
+/* data to create and access array on device */
+__managed__ int NUM_METADATA = 3;
+__managed__ int **deviceArr;
+__managed__ int currUnfinishedDep = 0;
+__managed__ int numDependecies;
+
+/* Thread execution counter */
 __device__ uint32_t count = 0;
+
+/* Synchronization variables */
 __device__ int mutex = 0;
 
 #endif

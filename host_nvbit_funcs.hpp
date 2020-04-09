@@ -1,16 +1,16 @@
+#include "global_variables.hpp"
 #include "nvbit.h"
 #include "nvbit_tool.h"
 #include "utils/channel.hpp"
-#include "global_variables.hpp"
 
 extern void record();
 extern void replay();
 extern void addRecordInstrumentation(CUcontext &ctx, CUfunction &f);
 extern void addReplayInstrumentation(CUcontext &ctx, CUfunction &f);
-extern void handleRecordKernelEvent(CUcontext &ctx, int is_exit, nvbit_api_cuda_t cbid,
-                             const char *name, void *params,
-                             CUresult *pStatus);
-extern void handleReplayKernelEvent(int is_exit);
+extern void handleRecordKernelEvent(CUcontext &ctx, int is_exit,
+                                    const char *name, cuLaunchKernel_params *p);
+extern void handleReplayKernelEvent(CUcontext &ctx, int is_exit,
+                                    const char *name, cuLaunchKernel_params *p);
 
 void nvbit_at_init() {
   setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
@@ -23,7 +23,7 @@ void nvbit_at_init() {
   GET_VAR_INT(
       phase, "RECORD_REPLAY_PHASE", 0,
       "if unset, executes record phase. Otherwise, executes replay phase");
-  GET_VAR_STR(filename, "RECORD_FILE",
+  GET_VAR_STR(record_file, "RECORD_FILE",
               "Name of the file where record output will be written");
   std::string pad(100, '-');
   printf("%s\n", pad.c_str());
@@ -50,20 +50,21 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
     return;
 
   if (cbid == API_CUDA_cuLaunchKernel_ptsz || cbid == API_CUDA_cuLaunchKernel) {
-
+    cuLaunchKernel_params *p = (cuLaunchKernel_params *)params;
     if (phase == recordReplayPhase::RECORD) {
-      handleRecordKernelEvent(ctx, is_exit, cbid, name, params, pStatus);
+      handleRecordKernelEvent(ctx, is_exit, name, p);
     } else {
-      handleReplayKernelEvent(is_exit);
+      handleReplayKernelEvent(ctx, is_exit, name, p);
     }
   }
 }
 
 void nvbit_at_ctx_init(CUcontext ctx) {
-  if (phase == recordReplayPhase::RECORD)
-      record();
-  else 
-      replay();
+  if (phase == recordReplayPhase::RECORD) {
+    record();
+  } else {
+    printf("Replaying...\n");
+  }
 }
 
 void nvbit_at_ctx_term(CUcontext ctx) {
@@ -75,8 +76,6 @@ void nvbit_at_ctx_term(CUcontext ctx) {
     fclose(fptr);
     printf("Recording complete!\n");
   } else {
-    cudaFree(deviceArr);
     printf("Replaying complete\n");
   }
 }
-

@@ -43,60 +43,17 @@
 /* for channel */
 #include "utils/channel.hpp"
 
-#include "global_variables.hpp"
 #include "channel_functions.hpp"
-#include "instrumentation_funcs.hpp"
+#include "global_variables.hpp"
 #include "host_nvbit_funcs.hpp"
+#include "instrumentation_funcs.hpp"
 
 void record() {
-    printf("Recording...\n");
-    fptr = fopen(filename.c_str(), "w");
-    recv_thread_started = true;
-    channel_host.init(0, CHANNEL_SIZE, &channel_dev, NULL);
-    pthread_create(&recv_thread, NULL, recv_thread_fun, NULL);
-}
-
-void replay() {
-    printf("Replaying...\n");
-    // fptr = fopen(filename.c_str(), "r");
-    fptr = fopen("tester_output.txt", "r");
-
-    // Create host array of device pointers
-    int Ncols;
-    fscanf(fptr, "%d", &Ncols);
-    int **hostArr = new int *[Ncols];
-
-    for (int i = 0; i < Ncols; ++i) {
-      int addr, num_threads;
-      fscanf(fptr, "%d %d", &addr, &num_threads);
-      int numSpots = num_threads + NUM_METADATA;
-      int *subArray = new int[numSpots];
-      subArray[0] = addr;
-      subArray[1] = num_threads;
-      subArray[2] = 0;
-
-      int curr_thread;
-      for (int j = 0; j < num_threads; ++j) {
-        fscanf(fptr, "%d", &curr_thread);
-        subArray[NUM_METADATA + j] = curr_thread;
-      }
-
-      CUDA_SAFECALL(cudaMalloc((void **)&hostArr[i], numSpots * sizeof(int)));
-      CUDA_SAFECALL(cudaMemcpy(hostArr[i], subArray, numSpots * sizeof(int),
-                               cudaMemcpyHostToDevice));
-
-      delete[] subArray;
-    }
-
-    // Copy to a device array of device pointers
-    CUDA_SAFECALL(cudaMalloc(&deviceArr, Ncols * sizeof(int *)));
-
-    CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr, Ncols * sizeof(int *),
-                             cudaMemcpyHostToDevice));
-
-    delete[] hostArr;
-
-    fclose(fptr);
+  printf("Recording...\n");
+  fptr = fopen(record_file.c_str(), "w");
+  recv_thread_started = true;
+  channel_host.init(0, CHANNEL_SIZE, &channel_dev, NULL);
+  pthread_create(&recv_thread, NULL, recv_thread_fun, NULL);
 }
 
 std::string getOpcodeBase(Instr *instr) {
@@ -123,6 +80,11 @@ bool isInstrOfInterst(Instr *instr) {
   return false;
 }
 
+int getFunctionHash(CUcontext ctx, const char *name,
+                    cuLaunchKernel_params *params) {
+  return 1234;
+}
+
 /* Function used to insert mem_record before every memory instruction
  * Used in nvbit_at_function_first_load */
 void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
@@ -130,7 +92,6 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
-    printf("%s\n", instr->getOpcode());
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
         !isInstrOfInterst(instr)) {
       cnt++;
@@ -219,11 +180,8 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
 
 /* Function used to handle the beginning and end of kernel launches during the
  * record phase Used in nvbit_at_cuda_event */
-void handleRecordKernelEvent(CUcontext &ctx, int is_exit, nvbit_api_cuda_t cbid,
-                             const char *name, void *params,
-                             CUresult *pStatus) {
-  cuLaunchKernel_params *p = (cuLaunchKernel_params *)params;
-
+void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
+                             cuLaunchKernel_params *p) {
   if (!is_exit) {
     recv_thread_receiving = true;
 
@@ -278,9 +236,58 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, nvbit_api_cuda_t cbid,
 
 /* Function used to handle the beginning and end of kernel launches during the
  * record phase Used in nvbit_at_cuda_event */
-void handleReplayKernelEvent(int is_exit) {
-  if (is_exit) {
+void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
+                             cuLaunchKernel_params *params) {
+  if (!is_exit) {
+    int file_prefix = getFunctionHash(ctx, name, params);
+    if (replay_files.find(file_prefix) == replay_files.end()) {
+      replay_files[file_prefix] = 0;
+    }
+    int file_suffix = replay_files[file_prefix];
+    replay_files[file_prefix]++;
+
+    std::string filename = std::to_string(file_prefix) + "_" +
+                           std::to_string(file_suffix) + ".txt";
+    fptr = fopen(filename.c_str(), "r");
+
+    // Create host array of device pointers
+    fscanf(fptr, "%d", &numDependecies);
+    int **hostArr = new int *[numDependecies];
+
+    for (int i = 0; i < numDependecies; ++i) {
+      int addr, num_threads;
+      fscanf(fptr, "%d %d", &addr, &num_threads);
+      int numSpots = num_threads + NUM_METADATA;
+      int *subArray = new int[numSpots];
+      subArray[0] = addr;
+      subArray[1] = num_threads;
+      subArray[2] = 0;
+
+      int curr_thread;
+      for (int j = 0; j < num_threads; ++j) {
+        fscanf(fptr, "%d", &curr_thread);
+        subArray[NUM_METADATA + j] = curr_thread;
+      }
+
+      CUDA_SAFECALL(cudaMalloc((void **)&hostArr[i], numSpots * sizeof(int)));
+      CUDA_SAFECALL(cudaMemcpy(hostArr[i], subArray, numSpots * sizeof(int),
+                               cudaMemcpyHostToDevice));
+
+      delete[] subArray;
+    }
+
+    // Copy to a device array of device pointers
+    CUDA_SAFECALL(cudaMalloc(&deviceArr, numDependecies * sizeof(int *)));
+
+    CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr, numDependecies * sizeof(int *),
+                             cudaMemcpyHostToDevice));
+
+    delete[] hostArr;
+
+    fclose(fptr);
+  } else {
     /* make sure current kernel is completed */
     cudaDeviceSynchronize();
+    cudaFree(deviceArr);
   }
 }

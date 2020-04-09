@@ -1,7 +1,7 @@
+#include "global_variables.hpp"
 #include "nvbit.h"
 #include "nvbit_tool.h"
 #include "utils/channel.hpp"
-#include "global_variables.hpp"
 
 __device__ void lock(int threadID) {
   while (0 != (atomicCAS(&mutex, 0, 1))) {
@@ -18,11 +18,9 @@ __device__ uint32_t get_TID() {
          (threadIdx.y * blockDim.x) + threadIdx.x;
 }
 
-
-
 /* Instrumentation function used to log memory accesses*/
-extern "C" __device__ __noinline__ 
-void mem_record(int pred, uint32_t op_type, uint32_t reg_high,
+extern "C" __device__ __noinline__ void
+mem_record(int pred, uint32_t op_type, uint32_t reg_high,
            uint32_t target_reg_high, uint32_t reg_low, uint32_t target_reg_low,
            int32_t imm) {
 
@@ -54,10 +52,10 @@ void mem_record(int pred, uint32_t op_type, uint32_t reg_high,
     rd.type_load_tid = op_type | threadID;
     channel_dev.push(&rd, sizeof(record_data));
   }
-} NVBIT_EXPORT_FUNC(mem_record);
+}
+NVBIT_EXPORT_FUNC(mem_record);
 
-extern "C" __device__ __noinline__ 
-void sync_record(int pred, int32_t op_type) {
+extern "C" __device__ __noinline__ void sync_record(int pred, int32_t op_type) {
 
   if (!pred) {
     return;
@@ -77,10 +75,10 @@ void sync_record(int pred, int32_t op_type) {
     rd.type_load_tid = op_type | threadID;
     channel_dev.push(&rd, sizeof(record_data));
   }
-} NVBIT_EXPORT_FUNC(sync_record);
+}
+NVBIT_EXPORT_FUNC(sync_record);
 
-extern "C" __device__ __noinline__ 
-void mem_replay(int pred) {
+extern "C" __device__ __noinline__ void mem_replay(int pred) {
   if (!pred) {
     return;
   }
@@ -95,8 +93,17 @@ void mem_replay(int pred) {
 
   if (laneid == first_laneid) {
     lock(threadID);
-    int *currInterest = deviceArr[start];
-    if (currInterest[0] == loc || true) {
+    int depIdx = -1;
+    for (int i = currUnfinishedDep; i < numDependecies; ++i) {
+      if (deviceArr[i][0] == loc) {
+        depIdx = i;
+        break;
+      }
+    }
+
+    if (depIdx != -1 || true) { // THE OR TRUE WILL HAVE TO BE REMOVED!!!!
+      depIdx = 0;               // THIS WILL NEED TO BE REMOVED
+      int *currInterest = deviceArr[depIdx];
       int curr_idx = currInterest[2];
       while (currInterest[NUM_METADATA + curr_idx] != threadID) {
         unlock(threadID);
@@ -106,10 +113,17 @@ void mem_replay(int pred) {
       printf("The thread being accessed is: %d\n", threadID);
       currInterest[2] += 1;
 
-      if (currInterest[1] == currInterest[2]) {
-        start += 1;
+      /* If we have seen the last thread for this dependency, increment
+       * currUnfinishedDep as much as possible */
+      if (currInterest[1] == currInterest[2] && depIdx == currUnfinishedDep) {
+        while (currUnfinishedDep < numDependecies &&
+               deviceArr[currUnfinishedDep][1] ==
+                   deviceArr[currUnfinishedDep][2]) {
+          currUnfinishedDep += 1;
+        }
       }
     }
     unlock(threadID);
   }
-} NVBIT_EXPORT_FUNC(mem_replay);
+}
+NVBIT_EXPORT_FUNC(mem_replay);
