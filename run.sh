@@ -9,30 +9,73 @@
 set -Eeuo pipefail
 
 usage() {
-    echo 'USAGE: ./run.sh EXEC'
-    echo '       EXEC          path to the executable to record and replay'
+    echo 'USAGE: ./run.sh EXEC [OPTIONS] '
+    echo ''
+    echo 'EXEC                     path to the executable to record and replay'
+    echo 'Options:'
+    echo '       --record          only run the record phase'
+    echo '       --filter          only run the data cleaning phase'
+    echo '       --replay          only run the replay phase'
+    echo '       --help            display usage message'
+    echo ''
     echo 'RUN setup.sh to disable ASLR if you care'
 }
 
-if [[ "$#" -ne 1 ]]; then
+record() {
+    export CUDA_VISIBLE_DEVICES=1
+    export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
+    RECORD_REPLAY_PHASE=0 $FULL_EXEC
+}
+
+filter() {
+    echo "Processing Data..."
+    export LD_PRELOAD=
+    $CURRENT_DIR/detector $CURRENT_DIR/recorded_data.txt
+    echo "Processing complete!"
+}
+
+replay() {
+    export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
+    RECORD_REPLAY_PHASE=1 $FULL_EXEC
+}
+
+if [[ "$#" -eq 1 || "$#" -eq 2 ]]; then
+    CURRENT_DIR="$( pwd )"
+    EXECUTABLE=$1
+    FULL_EXEC=$CURRENT_DIR/$EXECUTABLE
+
+    if [[ "$#" -eq 1 ]]; then
+        if [[ "$1" == "--help" ]]; then
+            usage 
+            exit 0
+        fi
+        record
+        filter
+        replay
+    else
+        case "$2" in
+            '--record')
+            record
+            ;;
+            '--filter')
+            filter
+            ;;
+            '--replay')
+            replay
+            ;;
+            '--help')
+            usage
+            exit 0
+            ;;
+            *)
+            echo "Invalid option"
+            usage
+            exit 1
+            ;;
+            esac
+    fi
+else
     echo "Illegal number of parameters"
     usage
     exit 1
 fi
-
-
-CURRENT_DIR="$( pwd )"
-EXECUTABLE=$1
-FULL_EXEC=$CURRENT_DIR/$EXECUTABLE
-
-export CUDA_VISIBLE_DEVICES=1
-export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
-RECORD_REPLAY_PHASE=0 $FULL_EXEC
-
-echo "Processing Data..."
-export LD_PRELOAD=
-$CURRENT_DIR/detector $CURRENT_DIR/recorded_data.txt
-echo "Processing complete!"
-
-export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
-RECORD_REPLAY_PHASE=1 $FULL_EXEC
