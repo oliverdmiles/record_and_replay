@@ -22,15 +22,18 @@ usage() {
 }
 
 record() {
-    export CUDA_VISIBLE_DEVICES=1
+    rm -rf record_output
+    mkdir record_output
     export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
     RECORD_REPLAY_PHASE=0 $FULL_EXEC
 }
 
 filter() {
     echo "Processing Data..."
+    rm -rf dependency_output
+    mkdir dependency_output
     export LD_PRELOAD=
-    $CURRENT_DIR/detector $CURRENT_DIR/recorded_data.txt
+    $CURRENT_DIR/detector $CURRENT_DIR/record_output/*
     echo "Processing complete!"
 }
 
@@ -40,6 +43,7 @@ replay() {
 }
 
 if [[ "$#" -eq 1 || "$#" -eq 2 ]]; then
+    export CUDA_VISIBLE_DEVICES=1
     CURRENT_DIR="$( pwd )"
     EXECUTABLE=$1
     FULL_EXEC=$CURRENT_DIR/$EXECUTABLE

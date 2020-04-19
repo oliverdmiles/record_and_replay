@@ -1,0 +1,403 @@
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 0 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+Before running kernel:
+Recording...
+    x: 100
+    y: 100
+Recording complete!
+After running kernel:
+    x: 212
+    y: 425
+Processing Data...
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 0 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 0 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+Processing complete!
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 1 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+Before running kernel:
+Replaying...
+    x: 100
+    y: 100
+Reading from dependency_output/4237157428130753307_0.dependencies
+Me: 33, Addr: 140736515279360, Idx: 0, Thread: 33
+Me: 1, Addr: 140736515279360, Idx: 0, Thread: 33
+Me: 65, Addr: 140736515279360, Idx: 0, Thread: 33
+Me: 97, Addr: 140736515279360, Idx: 0, Thread: 33
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 33
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 33 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 1
+Me: 33, Addr: 140736515279360, Idx: 1, Thread: 1
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 1 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 1, Addr: 140736515279360, Idx: 2, Thread: 65
+The thread being accessed is: 65
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 65 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 97
+Me: 65, Addr: 140736515279360, Idx: 3, Thread: 97
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 97 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 33
+Me: 97, Addr: 140736515279360, Idx: 4, Thread: 33
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 33 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 49, Addr: 140736515279360, Idx: 5, Thread: 65
+The thread being accessed is: 65
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 65 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 97
+Me: 81, Addr: 140736515279360, Idx: 6, Thread: 97
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 97 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 1
+Me: 113, Addr: 140736515279360, Idx: 7, Thread: 1
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 1 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 49
+Me: 17, Addr: 140736515279360, Idx: 8, Thread: 49
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 49 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 17
+Me: 49, Addr: 140736515279360, Idx: 9, Thread: 17
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 17 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 17, Addr: 140736515279360, Idx: 10, Thread: 81
+The thread being accessed is: 81
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 81 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 113
+Me: 81, Addr: 140736515279360, Idx: 11, Thread: 113
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 113 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 49
+Me: 113, Addr: 140736515279360, Idx: 12, Thread: 49
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 49 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 17
+Me: 49, Addr: 140736515279872, Idx: 0, Thread: 49
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 17 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 49
+Me: 17, Addr: 140736515279872, Idx: 0, Thread: 49
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 49 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 49, Addr: 140736515279872, Idx: 1, Thread: 17
+The thread being accessed is: 81
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 81 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 17
+Me: 81, Addr: 140736515279872, Idx: 1, Thread: 17
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 17 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 17, Addr: 140736515279872, Idx: 2, Thread: 81
+The thread being accessed is: 113
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 113 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 81
+Me: 113, Addr: 140736515279872, Idx: 2, Thread: 81
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 81 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 113
+Me: 81, Addr: 140736515279872, Idx: 3, Thread: 113
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 113 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 49
+Me: 113, Addr: 140736515279872, Idx: 4, Thread: 49
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 49 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 17
+Me: 63, Addr: 140736515279360, Idx: 16, Thread: 63
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 17 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 63
+Me: 31, Addr: 140736515279360, Idx: 16, Thread: 63
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 63 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 63, Addr: 140736515279360, Idx: 17, Thread: 31
+The thread being accessed is: 81
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 81 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 31
+Me: 95, Addr: 140736515279360, Idx: 17, Thread: 31
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 31 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 31, Addr: 140736515279360, Idx: 18, Thread: 95
+The thread being accessed is: 95
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 95 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 113
+Me: 95, Addr: 140736515279360, Idx: 19, Thread: 127
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 113 finished
+Me: 127, Addr: 140736515279360, Idx: 19, Thread: 127
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 127
+Starting load...
+Done with load!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 127 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 63
+Me: 127, Addr: 140736515279360, Idx: 20, Thread: 63
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 63 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+Me: 32, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 34, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 35, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 36, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 37, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 38, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 39, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 40, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 41, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 42, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 43, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 44, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 45, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 46, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 47, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 48, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 50, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 51, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 52, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 53, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 54, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 55, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 56, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 57, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 58, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 59, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 60, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 61, Addr: 140736515279360, Idx: 21, Thread: 95
+Me: 62, Addr: 140736515279360, Idx: 21, Thread: 95
+The thread being accessed is: 95
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 95 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 127
+Me: 64, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 66, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 67, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 68, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 69, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 70, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 71, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 72, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 73, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 74, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 75, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 76, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 77, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 78, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 79, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 80, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 82, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 83, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 84, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 85, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 86, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 87, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 88, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 89, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 90, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 91, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 92, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 93, Addr: 140736515279360, Idx: 22, Thread: 127
+Me: 94, Addr: 140736515279360, Idx: 22, Thread: 127
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 127 finished
+~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~
+The thread being accessed is: 31
+Me: 96, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 98, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 99, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 100, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 101, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 102, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 103, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 104, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 105, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 106, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 107, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 108, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 109, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 110, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 111, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 112, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 114, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 115, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 116, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 117, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 118, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 119, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 120, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 121, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 122, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 123, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 124, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 125, Addr: 140736515279360, Idx: 23, Thread: 31
+Me: 126, Addr: 140736515279360, Idx: 23, Thread: 31
+Starting store...
+Done with store!
+~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~
+Thread 31 finished
+Me: 0, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 2, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 3, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 4, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 5, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 6, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 7, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 8, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 9, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 10, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 11, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 12, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 13, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 14, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 15, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 16, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 18, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 19, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 20, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 21, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 22, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 23, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 24, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 25, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 26, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 27, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 28, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 29, Addr: 140736515279360, Idx: 24, Thread: 33
+Me: 30, Addr: 140736515279360, Idx: 24, Thread: 33

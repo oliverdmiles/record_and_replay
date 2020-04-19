@@ -73,7 +73,6 @@ void nvbit_at_ctx_term(CUcontext ctx) {
       recv_thread_started = false;
       pthread_join(recv_thread, NULL);
     }
-    fclose(fptr);
     printf("Recording complete!\n");
   } else {
     printf("Replaying complete\n");

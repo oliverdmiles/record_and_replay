@@ -4,7 +4,7 @@ CC = gcc
 CC_FLAGS = -g  -O2
 
 NTHREADS ?= 64
-NBLOCKS ?= 1
+NBLOCKS ?= 2
 SM ?= 50
 # CUDA compiler
 NVCC = nvcc

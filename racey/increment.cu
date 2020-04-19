@@ -1,29 +1,41 @@
-#include <stdio.h>
 #include <chrono>
+#include <stdio.h>
 #include <thread>
 
-__managed__ unsigned int x = 0;
-__managed__ unsigned int y = 0;
+__managed__ unsigned int x = 100;
+__managed__ unsigned int y = 100;
 
-__global__ void atomic_kernel() {
-    if (threadIdx.x%32 == 1 || threadIdx.x%32 == 17 || threadIdx.x%32 == 31) {
-        //printf("bx:%u\n", x);
-        x = x + 1;
-        // printf("ax:%u\n", x);
-        // printf("by:%u\n", y);
-        atomicInc((unsigned int*)&y, 4096);
-        //printf("ay:%u\n", y);
-    }
+__global__ void atomic_kernel(char *temp, short test) {
+  uint32_t blockID =
+      blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
+  uint32_t threadID = blockID * (blockDim.x * blockDim.y * blockDim.z) +
+                      (threadIdx.z * (blockDim.x * blockDim.y)) +
+                      (threadIdx.y * blockDim.x) + threadIdx.x;
+
+  // using char because only one byte in size
+  // printf("Thread id: %d\n", threadID);
+  if (threadIdx.x % 32 == 1) {
+    x = x - threadID;
+  } else if (threadIdx.x % 32 == 17) {
+    x = x * threadID;
+    y = y + threadID;
+  } else if (threadIdx.x % 32 == 31) {
+    x = x - threadID;
+  } else {
+    y = y + x;
+  }
 }
 
 int main() {
-    atomic_kernel<<<BLOCKS,THREADS>>>();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    cudaDeviceSynchronize();
-    printf("x:%u y:%u\n", x, y);
-    atomic_kernel<<<BLOCKS,THREADS>>>();
-    cudaDeviceSynchronize();
-    printf("x:%u y:%u\n", x, y);
-    cudaDeviceReset();
-    return 0;
+  printf("Before running kernel:\n");
+  printf("    x: %d\n", x);
+  printf("    y: %d\n", y);
+  atomic_kernel<<<BLOCKS, THREADS>>>(0, 5);
+  // std::this_thread::sleep_for(std::chrono::seconds(1));
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  printf("After running kernel:\n");
+  printf("    x: %d\n", x);
+  printf("    y: %d\n", y);
+  return 0;
 }

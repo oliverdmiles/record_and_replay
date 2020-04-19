@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string>
+#include <functional>
 #include <unistd.h>
 #include <vector>
 
@@ -50,7 +51,6 @@
 
 void record() {
   printf("Recording...\n");
-  fptr = fopen(record_file.c_str(), "w");
   recv_thread_started = true;
   channel_host.init(0, CHANNEL_SIZE, &channel_dev, NULL);
   pthread_create(&recv_thread, NULL, recv_thread_fun, NULL);
@@ -65,7 +65,7 @@ std::string getOpcodeBase(Instr *instr) {
   return opcode;
 }
 
-bool isInstrOfInterst(Instr *instr) {
+bool isInstrOfInterest(Instr *instr) {
   /* Memory instructions */
   if (instr->getMemOpType() != Instr::NONE) {
     return true;
@@ -80,9 +80,10 @@ bool isInstrOfInterst(Instr *instr) {
   return false;
 }
 
-int getFunctionHash(CUcontext ctx, const char *name,
-                    cuLaunchKernel_params *params) {
-  return 1234;
+uint64_t getFunctionHash(CUcontext ctx, cuLaunchKernel_params *p) {
+  std::string func_name(nvbit_get_func_name(ctx, p->f));
+  std::hash<std::string> func_hasher;
+  return func_hasher(func_name);
 }
 
 /* Function used to insert mem_record before every memory instruction
@@ -93,7 +94,7 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
-        !isInstrOfInterst(instr)) {
+        !isInstrOfInterest(instr)) {
       cnt++;
       continue;
     }
@@ -117,6 +118,9 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         nvbit_insert_call(instr, "mem_record", IPOINT_BEFORE);
       }
       op_type <<= 30;
+      if (instr->isExtended()) {
+        op_type |= 0x1;
+      }
       nvbit_add_call_arg_pred_val(instr);
       nvbit_add_call_arg_const_val32(instr, op_type);
 
@@ -161,7 +165,7 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
-        !isInstrOfInterst(instr)) {
+        !isInstrOfInterest(instr)) {
       cnt++;
       continue;
     }
@@ -173,6 +177,35 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
         instr->getMemOpType() == Instr::memOpType::GLOBAL) {
       nvbit_insert_call(instr, "mem_replay", IPOINT_BEFORE);
       nvbit_add_call_arg_pred_val(instr);
+
+      uint32_t is_extended = instr->isExtended();
+      nvbit_add_call_arg_const_val32(instr, is_extended);
+
+      const Instr::operand_t *op0 = instr->getOperand(0);
+      const Instr::operand_t *op1 = instr->getOperand(1);
+      const Instr::operand_t *temp = op0;
+      if (op0->type != Instr::MREF) {
+        op0 = op1;
+        op1 = temp;
+      }
+
+      /* reg high / target high */
+      if (instr->isExtended()) {
+        nvbit_add_call_arg_reg_val(instr, (int)op0->value[0] + 1);
+        nvbit_add_call_arg_const_val32(instr, (int)op1->value[0] + 1);
+      } else {
+        nvbit_add_call_arg_reg_val(instr, (int)Instr::RZ);
+        nvbit_add_call_arg_const_val32(instr, (int)Instr::RZ);
+      }
+      /* reg low */
+      nvbit_add_call_arg_reg_val(instr, (int)op0->value[0]);
+      /* target low */
+      nvbit_add_call_arg_const_val32(instr, (int)op1->value[0]);
+      /* immediate */
+      nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
+
+      nvbit_remove_orig(instr);
+
     } else if (instr->getMemOpType() == Instr::memOpType::NONE) {
     }
   }
@@ -203,6 +236,14 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     /* unset the skip flag */
     skip_flag = false;
 
+    uint64_t file_prefix = getFunctionHash(ctx, p);
+    if (replay_files.find(file_prefix) == replay_files.end()) {
+        replay_files[file_prefix] = 0;
+    }
+    int file_suffix = replay_files[file_prefix]++;
+    std::string file_name = "record_output/" + std::to_string(file_prefix) + "_" + std::to_string(file_suffix) + ".record";
+    fptr = fopen(file_name.c_str(), "w");
+    
     /* wait here until the receiving thread has not finished with the
      * current kernel */
     while (recv_thread_receiving) {
@@ -210,24 +251,24 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     }
 
     /* Write data at the conclusion of the function */
-    fprintf(fptr, "%s\n", nvbit_get_func_name(ctx, p->f));
     for (size_t i = 0; i < accesses.size(); ++i) {
       record_data rd = accesses[i];
       uint32_t time = (uint32_t)rd.time;
       if (rd.is_mem_instr) {
-        uint32_t base_tid = rd.type_load_tid & 0x3fffffff;
+        // uint32_t base_tid = rd.type_load_tid & 0x3fffffff;
+        uint32_t tid = rd.type_load_tid & 0x3fffffff;
         char type = (rd.type_load_tid & (uint32_t)(1 << 31)) ? 'G' : 'S';
         char load = (rd.type_load_tid & (1 << 30)) ? 'L' : 'S';
-        for (int i = 0; i < 32; ++i) {
-          fprintf(fptr, "%u %lu %d %c %c %f\n", time, rd.addr[i], base_tid + i,
-                  load, type, rd.value[i].d);
-        }
+        fprintf(fptr, "%u %lu %d %c %c %llu\n", time, rd.addr, tid, load, type,
+                rd.value.u64);
       } else {
-        uint32_t base_tid = rd.type_load_tid & 0x0fffffff;
-        std::string opcode = id_to_sync_instrs.at(rd.type_load_tid >> 28);
-        fprintf(fptr, "SYNC! %u %d %s\n", time, base_tid, opcode.c_str());
+        // TODO: Add in when ready
+        // uint32_t tid = rd.type_load_tid & 0x0fffffff;
+        // std::string opcode = id_to_sync_instrs.at(rd.type_load_tid >> 28);
+        // fprintf(fptr, "SYNC! %u %d %s\n", time, base_tid, opcode.c_str());
       }
     }
+    fclose(fptr);
 
     /* Clear the vector so that information is not written twice */
     accesses.clear();
@@ -239,38 +280,51 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
 void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
                              cuLaunchKernel_params *params) {
   if (!is_exit) {
-    int file_prefix = getFunctionHash(ctx, name, params);
+     uint64_t file_prefix = getFunctionHash(ctx, params);
     if (replay_files.find(file_prefix) == replay_files.end()) {
       replay_files[file_prefix] = 0;
     }
     int file_suffix = replay_files[file_prefix];
     replay_files[file_prefix]++;
 
-    std::string filename = std::to_string(file_prefix) + "_" +
-                           std::to_string(file_suffix) + ".txt";
+    std::string filename = "dependency_output/" + std::to_string(file_prefix) + "_" +
+                           std::to_string(file_suffix) + ".dependencies";
+    printf("Reading from %s\n", filename.c_str());
     fptr = fopen(filename.c_str(), "r");
 
     // Create host array of device pointers
-    fscanf(fptr, "%d", &numDependecies);
-    int **hostArr = new int *[numDependecies];
+    fscanf(fptr, "%lu", &numDependecies);
+    uint64_t **hostArr = new uint64_t *[numDependecies];
 
-    for (int i = 0; i < numDependecies; ++i) {
-      int addr, num_threads;
-      fscanf(fptr, "%d %d", &addr, &num_threads);
-      int numSpots = num_threads + NUM_METADATA;
-      int *subArray = new int[numSpots];
+    for (uint64_t i = 0; i < numDependecies; ++i) {
+      uint64_t addr, num_threads;
+      fscanf(fptr, "%lu %lu", &addr, &num_threads);
+      uint64_t numSpots = 3*num_threads + NUM_METADATA;
+      uint64_t *subArray = new uint64_t[numSpots];
       subArray[0] = addr;
       subArray[1] = num_threads;
       subArray[2] = 0;
 
-      int curr_thread;
-      for (int j = 0; j < num_threads; ++j) {
-        fscanf(fptr, "%d", &curr_thread);
+      uint64_t curr_thread;
+      char load_or_store;
+      uint64_t value;
+      for (uint64_t j = 0; j < 3*num_threads; j += 3) {
+        fscanf(fptr, "%lu %s %lu", &curr_thread, &load_or_store, &value);
         subArray[NUM_METADATA + j] = curr_thread;
+        
+        if (load_or_store == 'L') {
+          subArray[NUM_METADATA + j + 1] = 1;
+        } else {
+          subArray[NUM_METADATA + j + 1] = 0;
+         }
+        
+        subArray[NUM_METADATA + j + 2] = value;
       }
 
-      CUDA_SAFECALL(cudaMalloc((void **)&hostArr[i], numSpots * sizeof(int)));
-      CUDA_SAFECALL(cudaMemcpy(hostArr[i], subArray, numSpots * sizeof(int),
+      CUDA_SAFECALL(
+          cudaMalloc((void **)&hostArr[i], numSpots * sizeof(uint64_t)));
+      CUDA_SAFECALL(cudaMemcpy(hostArr[i], subArray,
+                               numSpots * sizeof(uint64_t),
                                cudaMemcpyHostToDevice));
 
       delete[] subArray;

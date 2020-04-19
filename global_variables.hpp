@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-
 /* Channel used to communicate from GPU to CPU receiving thread */
 #define CHANNEL_SIZE (1l << 20)
 static __managed__ ChannelDev channel_dev;
@@ -57,21 +56,34 @@ typedef struct {
    * would like to record memory operation size and embed as well - probably
    * need 2 bits but maybe 1 */
   uint32_t type_load_tid;
-  uint64_t addr[32];
-  Data value[32];
+  uint64_t addr;
+  Data value;
 } record_data;
 
 /* vector to store all accesses for a single kernel call  */
 std::vector<record_data> accesses;
 
 /* map from replay files to the next index to be read */
-std::map<int, int> replay_files;
+std::map<uint64_t, int> replay_files;
 
-/* data to create and access array on device */
+/* number of slots in deviceArr filled by metadata
+   slot 0: address with data race
+   slot 1: number of threads participating in data race
+   slot 2: index of next thread to execute */
 __managed__ int NUM_METADATA = 3;
-__managed__ int **deviceArr;
-__managed__ int currUnfinishedDep = 0;
-__managed__ int numDependecies;
+
+/* array on the device used to replay data races. Format is as follows:
+   slots 0-2: metadata. See above
+   slot 3x: thread id
+   slot 3x + 1: 1 if instruction is a load, 0 otherwise 
+   slot 3x + 2: value being loaded or stored */
+__managed__ uint64_t **deviceArr;
+
+/* Index of the earlier address by timestamp that still has not resolved all dependencies*/
+__device__ int current_laneid = 0;
+
+/* The total number of addresses with data races */
+__managed__ uint64_t numDependecies;
 
 /* Thread execution counter */
 __device__ uint32_t count = 0;
