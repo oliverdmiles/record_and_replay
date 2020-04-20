@@ -15,25 +15,23 @@ __device__ uint32_t get_TID() {
          (threadIdx.y * blockDim.x) + threadIdx.x;
 }
 
-/* Instrumentation function used to log memory accesses*/
+/* Instrumentation function used to log memory accesses */
 extern "C" __device__ __noinline__ void
 mem_record(int pred, uint32_t op_type, uint32_t reg_high,
            uint32_t target_reg_high, uint32_t reg_low, uint32_t target_reg_low,
-           int32_t imm) {
-
+           int32_t imm, int32_t cnt) {
   if (!pred) {
     return;
   }
   int64_t base_addr = (((uint64_t)reg_high) << 32) | ((uint64_t)reg_low);
   uint64_t addr = base_addr + imm;
-  uint32_t volatile load = op_type & 0x7FFFFFFE;
-  uint64_t val =
-      load ? (uint64_t)(*(uint64_t *)(addr))
-           : (((uint64_t)target_reg_high) << 32) | ((uint64_t)target_reg_low);
+  uint64_t val = (((uint64_t)nvbit_read_reg(target_reg_high)) << 32) |
+                 ((uint64_t)nvbit_read_reg(target_reg_low));
+
   uint32_t is_extended = op_type & 0x1;
   uint32_t threadID = get_TID();
   val = is_extended ? val : val & 0xffffffff;
-  
+
   record_data rd;
   rd.addr = addr;
   rd.value.u64 = val;
@@ -68,8 +66,9 @@ extern "C" __device__ __noinline__ void sync_record(int pred, int32_t op_type) {
 NVBIT_EXPORT_FUNC(sync_record);
 
 extern "C" __device__ __noinline__ void
-mem_replay(int pred, uint32_t is_extended, uint32_t reg_high, uint32_t target_reg_high,
-           uint32_t reg_low, uint32_t target_reg_low, int32_t imm) {
+mem_replay(int pred, uint32_t is_extended, uint32_t reg_high,
+           uint32_t target_reg_high, uint32_t reg_low, uint32_t target_reg_low,
+           int32_t imm, int32_t count) {
   if (!pred) {
     return;
   }
@@ -88,6 +87,7 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high, uint32_t target_re
   bool isDependent = false;
   uint64_t depIdx = 0;
 
+  // printf("Started thread %d\n", threadID);
   for (uint64_t i = 0; i < numDependecies; ++i) {
     if (deviceArr[i][0] == addr) {
       depIdx = i;
@@ -96,47 +96,55 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high, uint32_t target_re
     }
   }
   if (!isDependent) {
-    printf("No instructions match: %lu %lu\n", deviceArr[0][0], addr);
+    printf("No instructions match: %lu\n", addr);
     return;
   }
-  
-  printf("Me: %d, Addr: %lu, Idx: %lu, Thread: %lu\n",  threadID, deviceArr[depIdx][0], deviceArr[depIdx][2], deviceArr[depIdx][NUM_METADATA + 3 * deviceArr[depIdx][2]]);
+
   while (waiting) {
-    uint64_t indexOfNextThread = deviceArr[depIdx][2];
-    if (deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread] == threadID && lock()) {
-      printf("~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~\n");
-      printf("The thread being accessed is: %d on address: %lu\n", threadID, deviceArr[depIdx][0]);
+    uint64_t numThreadNext = deviceArr[depIdx][2];
+    if (numThreadNext == deviceArr[depIdx][1]) {
+      break;
+    }
+    uint64_t indexOfNextThread = NUM_METADATA + 3 * numThreadNext;
+    if (deviceArr[depIdx][indexOfNextThread] == threadID && lock()) {
+      printf("Curent thread: %d, Address %lu\n", threadID, addr);
       /* START OF WRITING OR READING */
-      //is is_load supposed to be 64 bits? This uses 2 registers vs 1
-      uint64_t is_load = deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 1];
-      uint32_t value_low = deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 2] & 0xffffffff;
-      uint32_t value_high = (deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 2] >> 32) & 0xffffffff;
-      
+      // is is_load supposed to be 64 bits? This uses 2 registers vs 1
+      uint64_t is_load =
+          deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 1];
+      uint32_t value_low =
+          deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 2] &
+          0xffffffff;
+      uint32_t value_high =
+          (deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 2] >> 32) &
+          0xffffffff;
+
       if (is_load) {
         // load here
-        printf("Starting load...\n");
+        printf("Before load low: %llx\n", nvbit_read_reg(target_reg_low));
+        printf("Before load high: %llx\n", nvbit_read_reg(target_reg_high));
         nvbit_write_reg(target_reg_low, value_low);
-        if (is_extended) 
+        if (is_extended) {
           nvbit_write_reg(target_reg_high, value_high);
-        printf("Done with load!\n");
+        }
+        printf("After load low: %llx\n", nvbit_read_reg(target_reg_low));
+        printf("After load high: %llx\n", nvbit_read_reg(target_reg_high));
       } else {
         // store here
-        printf("Starting store...\n");
         void *ptr = (void *)addr;
-        if (is_extended) *(uint64_t *)(ptr) = ((uint64_t)value_high << 32) | (uint64_t)value_low;
-        else *(uint32_t *)(ptr) = value_low;
-
-        printf("Done with store!\n");
+        if (is_extended)
+          *(uint64_t *)(ptr) =
+              ((uint64_t)value_high << 32) | (uint64_t)value_low;
+        else
+          *(uint32_t *)(ptr) = value_low;
       }
 
       /* END OF WRITING OR READING */
       deviceArr[depIdx][2] += 1;
 
       waiting = false;
-      printf("~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~\n");
       unlock();
     }
   }
-  printf("Thread %d finished\n", threadID);
 }
 NVBIT_EXPORT_FUNC(mem_replay);

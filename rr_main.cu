@@ -26,12 +26,12 @@
  */
 
 #include <assert.h>
+#include <functional>
 #include <map>
 #include <queue>
 #include <stdint.h>
 #include <stdio.h>
 #include <string>
-#include <functional>
 #include <unistd.h>
 #include <vector>
 
@@ -104,54 +104,61 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
 
     if (instr->getMemOpType() == Instr::memOpType::SHARED ||
         instr->getMemOpType() == Instr::memOpType::GLOBAL) {
-      uint32_t op_type = 0;
-      /* 00 is shared store
-       * 01 is shared load
-       * 10 is global store
-       * 11 is global load */
-      if (instr->getMemOpType() == Instr::memOpType::GLOBAL)
-        op_type = 2;
-      if (instr->isLoad()) {
-        nvbit_insert_call(instr, "mem_record", IPOINT_BEFORE);
-        op_type |= 1;
-      } else {
-        nvbit_insert_call(instr, "mem_record", IPOINT_BEFORE);
-      }
-      op_type <<= 30;
-      if (instr->isExtended()) {
-        op_type |= 0x1;
-      }
-      nvbit_add_call_arg_pred_val(instr);
-      nvbit_add_call_arg_const_val32(instr, op_type);
 
-      const Instr::operand_t *op0 = instr->getOperand(0);
-      const Instr::operand_t *op1 = instr->getOperand(1);
-      const Instr::operand_t *temp = op0;
-      if (op0->type != Instr::MREF) {
-        op0 = op1;
-        op1 = temp;
+      /* Instrument loads before and after. Instrument stores before. */
+      for (int i = 0; i < 2; ++i) {
+        uint32_t op_type = 0;
+        /* 00 is shared store
+         * 01 is shared load
+         * 10 is global store
+         * 11 is global load */
+        if (instr->getMemOpType() == Instr::memOpType::GLOBAL)
+          op_type = 2;
+        if (instr->isLoad()) {
+          nvbit_insert_call(instr, "mem_record", (ipoint_t)i);
+          op_type |= 1;
+        } else if (i == 0) { /* if i = 0, then we are instrumenting before */
+          nvbit_insert_call(instr, "mem_record", (ipoint_t)i);
+        }
+        op_type <<= 30;
+        if (instr->isExtended()) {
+          op_type |= 0x1;
+        }
+        nvbit_add_call_arg_pred_val(instr);
+        nvbit_add_call_arg_const_val32(instr, op_type);
+
+        const Instr::operand_t *op0 = instr->getOperand(0);
+        const Instr::operand_t *op1 = instr->getOperand(1);
+        const Instr::operand_t *temp = op0;
+        printf("Operand types: %d %d\n", op0->type, op1->type);
+        if (op0->type != Instr::MREF) {
+          op0 = op1;
+          op1 = temp;
+        }
+        /* reg high / target high */
+        if (instr->isExtended()) {
+          nvbit_add_call_arg_reg_val(instr, (int)op0->value[0] + 1);
+          nvbit_add_call_arg_const_val32(instr, (int)op1->value[0] + 1);
+        } else {
+          nvbit_add_call_arg_reg_val(instr, (int)Instr::RZ);
+          nvbit_add_call_arg_const_val32(instr, (int)Instr::RZ);
+        }
+        /* reg low */
+        nvbit_add_call_arg_reg_val(instr, (int)op0->value[0]);
+        /* target low */
+        nvbit_add_call_arg_const_val32(instr, (int)op1->value[0]);
+        /* immediate */
+        nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
+        nvbit_add_call_arg_const_val32(instr, cnt);
       }
-      /* reg high / target high */
-      if (instr->isExtended()) {
-        nvbit_add_call_arg_reg_val(instr, (int)op0->value[0] + 1);
-        nvbit_add_call_arg_reg_val(instr, (int)op1->value[0] + 1);
-      } else {
-        nvbit_add_call_arg_reg_val(instr, (int)Instr::RZ);
-        nvbit_add_call_arg_reg_val(instr, (int)Instr::RZ);
-      }
-      /* reg low */
-      nvbit_add_call_arg_reg_val(instr, (int)op0->value[0]);
-      /* target low */
-      nvbit_add_call_arg_reg_val(instr, (int)op1->value[0]);
-      /* immediate */
-      nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
+
     } else if (instr->getMemOpType() == Instr::memOpType::NONE) {
-      nvbit_insert_call(instr, "sync_record", IPOINT_BEFORE);
-      nvbit_add_call_arg_pred_val(instr);
+      // nvbit_insert_call(instr, "sync_record", IPOINT_BEFORE);
+      // nvbit_add_call_arg_pred_val(instr);
 
-      uint32_t optype = sync_instrs_to_id.at(getOpcodeBase(instr)) << 28;
+      // uint32_t optype = sync_instrs_to_id.at(getOpcodeBase(instr)) << 28;
 
-      nvbit_add_call_arg_const_val32(instr, optype);
+      // nvbit_add_call_arg_const_val32(instr, optype);
     }
     cnt++;
   }
@@ -164,6 +171,7 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
+    // instr->print();
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
         !isInstrOfInterest(instr)) {
       cnt++;
@@ -203,11 +211,13 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
       nvbit_add_call_arg_const_val32(instr, (int)op1->value[0]);
       /* immediate */
       nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
+      nvbit_add_call_arg_const_val32(instr, cnt);
 
       nvbit_remove_orig(instr);
 
     } else if (instr->getMemOpType() == Instr::memOpType::NONE) {
     }
+    cnt++;
   }
 }
 
@@ -238,12 +248,13 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
 
     uint64_t file_prefix = getFunctionHash(ctx, p);
     if (replay_files.find(file_prefix) == replay_files.end()) {
-        replay_files[file_prefix] = 0;
+      replay_files[file_prefix] = 0;
     }
     int file_suffix = replay_files[file_prefix]++;
-    std::string file_name = "record_output/" + std::to_string(file_prefix) + "_" + std::to_string(file_suffix) + ".record";
+    std::string file_name = "record_output/" + std::to_string(file_prefix) +
+                            "_" + std::to_string(file_suffix) + ".record";
     fptr = fopen(file_name.c_str(), "w");
-    
+
     /* wait here until the receiving thread has not finished with the
      * current kernel */
     while (recv_thread_receiving) {
@@ -280,15 +291,15 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
 void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
                              cuLaunchKernel_params *params) {
   if (!is_exit) {
-     uint64_t file_prefix = getFunctionHash(ctx, params);
+    uint64_t file_prefix = getFunctionHash(ctx, params);
     if (replay_files.find(file_prefix) == replay_files.end()) {
       replay_files[file_prefix] = 0;
     }
     int file_suffix = replay_files[file_prefix];
     replay_files[file_prefix]++;
 
-    std::string filename = "dependency_output/" + std::to_string(file_prefix) + "_" +
-                           std::to_string(file_suffix) + ".dependencies";
+    std::string filename = "dependency_output/" + std::to_string(file_prefix) +
+                           "_" + std::to_string(file_suffix) + ".dependencies";
     printf("Reading from %s\n", filename.c_str());
     fptr = fopen(filename.c_str(), "r");
 
@@ -299,7 +310,7 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     for (uint64_t i = 0; i < numDependecies; ++i) {
       uint64_t addr, num_threads;
       fscanf(fptr, "%lu %lu", &addr, &num_threads);
-      uint64_t numSpots = 3*num_threads + NUM_METADATA;
+      uint64_t numSpots = 3 * num_threads + NUM_METADATA;
       uint64_t *subArray = new uint64_t[numSpots];
       subArray[0] = addr;
       subArray[1] = num_threads;
@@ -308,16 +319,16 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
       uint64_t curr_thread;
       char load_or_store;
       uint64_t value;
-      for (uint64_t j = 0; j < 3*num_threads; j += 3) {
+      for (uint64_t j = 0; j < 3 * num_threads; j += 3) {
         fscanf(fptr, "%lu %s %lu", &curr_thread, &load_or_store, &value);
         subArray[NUM_METADATA + j] = curr_thread;
-        
+
         if (load_or_store == 'L') {
           subArray[NUM_METADATA + j + 1] = 1;
         } else {
           subArray[NUM_METADATA + j + 1] = 0;
-         }
-        
+        }
+
         subArray[NUM_METADATA + j + 2] = value;
       }
 
@@ -342,6 +353,10 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
   } else {
     /* make sure current kernel is completed */
     cudaDeviceSynchronize();
+    cudaError_t err = cudaGetLastError();
+    printf("Error: %d, Success: %d\n", err, cudaSuccess);
+    printf("Error string: %s\n", cudaGetErrorString(err));
+    assert(cudaGetLastError() == cudaSuccess);
     cudaFree(deviceArr);
   }
 }

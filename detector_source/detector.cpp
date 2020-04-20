@@ -71,9 +71,9 @@ void find_dependencies(string output_file) {
 
 	set<Access*, Acc_compare> dependencies;
 	for (auto map_it = accs.begin(); map_it != accs.end(); map_it++) {
-		if (map_it->second.size() > 1) {
+		//if (map_it->second.size() > 1) {
 			dependencies.insert(*map_it->second.begin());
-		}
+		//}
 	}
 	file << dependencies.size() << endl;
 
