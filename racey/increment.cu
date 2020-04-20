@@ -28,14 +28,14 @@ __global__ void atomic_kernel(char *temp, short test) {
 
 int main() {
   printf("Before running kernel:\n");
-  printf("    x: %d\n", x);
-  printf("    y: %d\n", y);
+  printf("    x: %x\n", x);
+  printf("    y: %x\n", y);
   atomic_kernel<<<BLOCKS, THREADS>>>(0, 5);
   // std::this_thread::sleep_for(std::chrono::seconds(1));
   cudaDeviceSynchronize();
   cudaDeviceReset();
   printf("After running kernel:\n");
-  printf("    x: %d\n", x);
-  printf("    y: %d\n", y);
+  printf("    x: %x\n", x);
+  printf("    y: %x\n", y);
   return 0;
 }

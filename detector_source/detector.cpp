@@ -52,7 +52,9 @@ void read_file(string filename) {
 	while (file >> timestamp) {
 		Access *acc = new Access;
 		acc->timestamp = timestamp;
-		file >> acc->address >> acc->thread_id >> op >> type >> acc->value;
+        string temp;
+		file >> acc->address >> acc->thread_id >> op >> type >> temp;
+        acc->value = std::stoull(temp, nullptr, 0);
 		acc->load = (op == "L");
 		acc->shared = (type == "S");
 
@@ -83,7 +85,7 @@ void find_dependencies(string output_file) {
 		auto end = accs[addr].end();
 		for (auto it = accs[addr].begin(); it != end; it++) {
 			file << " " << (*it)->thread_id << " " << ((*it)->load ? "L" : "S");
-			file << " " << (*it)->value;
+			file << " 0x" << std::hex << (*it)->value << std::dec;
 		}
 		file << endl;
 	}

@@ -24,12 +24,9 @@ mem_record(int pred, uint32_t op_type, uint32_t reg_high,
   if (!pred) {
     return;
   }
-  int64_t base_addr = (((uint64_t)reg_high) << 32) | ((uint64_t)reg_low);
+  uint64_t base_addr = (((uint64_t)reg_high) << 32) | ((uint64_t)reg_low);
   uint64_t addr = base_addr + imm;
-  uint32_t volatile load = op_type & 0x7FFFFFFE;
-  uint64_t val =
-      load ? (uint64_t)(*(uint64_t *)(addr))
-           : (((uint64_t)target_reg_high) << 32) | ((uint64_t)target_reg_low);
+  uint64_t val = (((uint64_t)target_reg_high) << 32) | ((uint64_t)target_reg_low);
   uint32_t is_extended = op_type & 0x1;
   uint32_t threadID = get_TID();
   val = is_extended ? val : val & 0xffffffff;
@@ -100,12 +97,12 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high, uint32_t target_re
     return;
   }
   
-  printf("Me: %d, Addr: %lu, Idx: %lu, Thread: %lu\n",  threadID, deviceArr[depIdx][0], deviceArr[depIdx][2], deviceArr[depIdx][NUM_METADATA + 3 * deviceArr[depIdx][2]]);
+  // printf("Me: %d, Addr: %lu, Idx: %lu, Thread: %lu\n",  threadID, deviceArr[depIdx][0], deviceArr[depIdx][2], deviceArr[depIdx][NUM_METADATA + 3 * deviceArr[depIdx][2]]);
   while (waiting) {
     uint64_t indexOfNextThread = deviceArr[depIdx][2];
     if (deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread] == threadID && lock()) {
-      printf("~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~\n");
-      printf("The thread being accessed is: %d on address: %lu\n", threadID, deviceArr[depIdx][0]);
+      //printf("~~~~~~~~~~~~~LOCKED~~~~~~~~~~~~~~~~~~\n");
+      //printf("The thread being accessed is: %d on address: %lu\n", threadID, deviceArr[depIdx][0]);
       /* START OF WRITING OR READING */
       //is is_load supposed to be 64 bits? This uses 2 registers vs 1
       uint64_t is_load = deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 1];
@@ -114,29 +111,29 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high, uint32_t target_re
       
       if (is_load) {
         // load here
-        printf("Starting load...\n");
+        //printf("Starting load...\n");
         nvbit_write_reg(target_reg_low, value_low);
         if (is_extended) 
           nvbit_write_reg(target_reg_high, value_high);
-        printf("Done with load!\n");
+        //printf("Done with load!\n");
       } else {
         // store here
-        printf("Starting store...\n");
+        //printf("Starting store...\n");
         void *ptr = (void *)addr;
         if (is_extended) *(uint64_t *)(ptr) = ((uint64_t)value_high << 32) | (uint64_t)value_low;
         else *(uint32_t *)(ptr) = value_low;
 
-        printf("Done with store!\n");
+        //printf("Done with store!\n");
       }
 
       /* END OF WRITING OR READING */
       deviceArr[depIdx][2] += 1;
 
       waiting = false;
-      printf("~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~\n");
+      //printf("~~~~~~~~~~~~~UNLOCKED~~~~~~~~~~~~~~~~~~\n");
       unlock();
     }
   }
-  printf("Thread %d finished\n", threadID);
+  // printf("Thread %d finished\n", threadID);
 }
 NVBIT_EXPORT_FUNC(mem_replay);
