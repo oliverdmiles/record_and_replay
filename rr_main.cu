@@ -93,13 +93,14 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
+    if (verbose) {
+      //instr->printDecoded();
+      instr->print();
+    }
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
         !isInstrOfInterest(instr)) {
       cnt++;
       continue;
-    }
-    if (verbose) {
-      instr->printDecoded();
     }
 
     if (instr->getMemOpType() == Instr::memOpType::SHARED ||
@@ -270,7 +271,7 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
         uint32_t tid = rd.type_load_tid & 0x3fffffff;
         char type = (rd.type_load_tid & (uint32_t)(1 << 31)) ? 'G' : 'S';
         char load = (rd.type_load_tid & (1 << 30)) ? 'L' : 'S';
-        fprintf(fptr, "%u %lu %d %c %c %llu\n", time, rd.addr, tid, load, type,
+        fprintf(fptr, "%u %lu %d %c %c %p\n", time, rd.addr, tid, load, type,
                 rd.value.u64);
       } else {
         // TODO: Add in when ready
@@ -319,10 +320,9 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
       uint64_t curr_thread;
       char load_or_store;
       uint64_t value;
-      for (uint64_t j = 0; j < 3 * num_threads; j += 3) {
-        fscanf(fptr, "%lu %s %lu", &curr_thread, &load_or_store, &value);
+      for (uint64_t j = 0; j < 3*num_threads; j += 3) {
+        fscanf(fptr, "%lu %s %llx", &curr_thread, &load_or_store, &value);
         subArray[NUM_METADATA + j] = curr_thread;
-
         if (load_or_store == 'L') {
           subArray[NUM_METADATA + j + 1] = 1;
         } else {
