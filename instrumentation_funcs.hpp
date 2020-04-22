@@ -24,6 +24,7 @@ mem_record(int pred, uint32_t op_type, uint32_t reg_high,
   if (!pred) {
     return;
   }
+
   uint64_t base_addr = (((uint64_t)reg_high) << 32) | ((uint64_t)reg_low);
   uint64_t addr = base_addr + imm;
   uint64_t val = (((uint64_t)target_reg_high) << 32) | ((uint64_t)target_reg_low);
