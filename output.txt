@@ -1,0 +1,67 @@
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 0 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+Before running kernel:
+Recording...
+    x: 100
+    y: 100
+Recording complete!
+After running kernel:
+    x: 3860
+    y: 4073
+Processing Data...
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 0 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 0 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+Processing complete!
+------------- NVBit (NVidia Binary Instrumentation Tool v1.1) Loaded --------------
+NVBit core environment variables (mostly for nvbit-devs):
+           NOINSPECT = 0 - if set, skips function inspection and instrumentation
+            NVDISASM = nvdisasm - override default nvdisasm found in PATH
+            NOBANNER = 0 - if set, does not print this banner
+---------------------------------------------------------------------------------
+         INSTR_BEGIN = 0 - Beginning of the instruction interval where to apply instrumentation
+           INSTR_END = 4294967295 - End of the instruction interval where to apply instrumentation
+        TOOL_VERBOSE = 0 - Enable verbosity inside the tool
+ RECORD_REPLAY_PHASE = 1 - if unset, executes record phase. Otherwise, executes replay phase
+         RECORD_FILE = recorded_data.txt - Name of the file where record output will be written
+----------------------------------------------------------------------------------------------------
+Before running kernel:
+Replaying...
+    x: 100
+    y: 100
+Reading from dependency_output/4237157428130753307_0.dependencies
+Replaying complete
+After running kernel:
+    x: 3860
+    y: 4073

@@ -49,13 +49,6 @@
 #include "host_nvbit_funcs.hpp"
 #include "instrumentation_funcs.hpp"
 
-void record() {
-  printf("Recording...\n");
-  recv_thread_started = true;
-  channel_host.init(0, CHANNEL_SIZE, &channel_dev, NULL);
-  pthread_create(&recv_thread, NULL, recv_thread_fun, NULL);
-}
-
 std::string getOpcodeBase(Instr *instr) {
   std::string opcode = instr->getOpcode();
   std::size_t first_dot = opcode.find(".");
@@ -131,7 +124,6 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         const Instr::operand_t *op0 = instr->getOperand(0);
         const Instr::operand_t *op1 = instr->getOperand(1);
         const Instr::operand_t *temp = op0;
-        printf("Operand types: %d %d\n", op0->type, op1->type);
         if (op0->type != Instr::MREF) {
           op0 = op1;
           op1 = temp;
@@ -301,7 +293,6 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
 
     std::string filename = "dependency_output/" + std::to_string(file_prefix) +
                            "_" + std::to_string(file_suffix) + ".dependencies";
-    printf("Reading from %s\n", filename.c_str());
     fptr = fopen(filename.c_str(), "r");
 
     // Create host array of device pointers
@@ -342,9 +333,9 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     }
 
     // Copy to a device array of device pointers
-    CUDA_SAFECALL(cudaMalloc(&deviceArr, numDependecies * sizeof(int *)));
+    CUDA_SAFECALL(cudaMalloc(&deviceArr, numDependecies * sizeof(uint64_t *)));
 
-    CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr, numDependecies * sizeof(int *),
+    CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr, numDependecies * sizeof(uint64_t *),
                              cudaMemcpyHostToDevice));
 
     delete[] hostArr;
@@ -353,10 +344,9 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
   } else {
     /* make sure current kernel is completed */
     cudaDeviceSynchronize();
-    cudaError_t err = cudaGetLastError();
-    printf("Error: %d, Success: %d\n", err, cudaSuccess);
-    printf("Error string: %s\n", cudaGetErrorString(err));
     assert(cudaGetLastError() == cudaSuccess);
-    cudaFree(deviceArr);
+
+    CUDA_SAFECALL(cudaFree(deviceArr));
+    assert(cudaGetLastError() == cudaSuccess);
   }
 }

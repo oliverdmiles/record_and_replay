@@ -25,21 +25,19 @@ record() {
     rm -rf record_output
     mkdir record_output
     export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
-    RECORD_REPLAY_PHASE=0 $FULL_EXEC
+    RECORD_REPLAY_PHASE=0 NOBANNER=1 $FULL_EXEC
 }
 
 filter() {
-    echo "Processing Data..."
+    export LD_PRELOAD=
     rm -rf dependency_output
     mkdir dependency_output
-    export LD_PRELOAD=
     $CURRENT_DIR/detector $CURRENT_DIR/record_output/*
-    echo "Processing complete!"
 }
 
 replay() {
     export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
-    RECORD_REPLAY_PHASE=1 $FULL_EXEC
+    RECORD_REPLAY_PHASE=1 NOBANNER=1 $FULL_EXEC
 }
 
 if [[ "$#" -eq 1 || "$#" -eq 2 ]]; then

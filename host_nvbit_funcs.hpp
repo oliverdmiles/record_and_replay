@@ -61,9 +61,9 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
 
 void nvbit_at_ctx_init(CUcontext ctx) {
   if (phase == recordReplayPhase::RECORD) {
-    record();
-  } else {
-    printf("Replaying...\n");
+    recv_thread_started = true;
+    channel_host.init(0, CHANNEL_SIZE, &channel_dev, NULL);
+    pthread_create(&recv_thread, NULL, recv_thread_fun, NULL);
   }
 }
 
@@ -73,8 +73,5 @@ void nvbit_at_ctx_term(CUcontext ctx) {
       recv_thread_started = false;
       pthread_join(recv_thread, NULL);
     }
-    printf("Recording complete!\n");
-  } else {
-    printf("Replaying complete\n");
   }
 }

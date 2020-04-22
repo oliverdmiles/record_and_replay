@@ -107,28 +107,20 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high,
     }
     uint64_t indexOfNextThread = NUM_METADATA + 3 * numThreadNext;
     if (deviceArr[depIdx][indexOfNextThread] == threadID && lock()) {
-      printf("Curent thread: %d, Address %lu\n", threadID, addr);
       /* START OF WRITING OR READING */
       // is is_load supposed to be 64 bits? This uses 2 registers vs 1
-      uint64_t is_load =
-          deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 1];
+      uint64_t is_load = deviceArr[depIdx][indexOfNextThread + 1];
       uint32_t value_low =
-          deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 2] &
-          0xffffffff;
+          deviceArr[depIdx][indexOfNextThread + 2] & 0xffffffff;
       uint32_t value_high =
-          (deviceArr[depIdx][NUM_METADATA + 3 * indexOfNextThread + 2] >> 32) &
-          0xffffffff;
+          (deviceArr[depIdx][indexOfNextThread + 2] >> 32) & 0xffffffff;
 
       if (is_load) {
         // load here
-        printf("Before load low: %llx\n", nvbit_read_reg(target_reg_low));
-        printf("Before load high: %llx\n", nvbit_read_reg(target_reg_high));
         nvbit_write_reg(target_reg_low, value_low);
         if (is_extended) {
           nvbit_write_reg(target_reg_high, value_high);
         }
-        printf("After load low: %llx\n", nvbit_read_reg(target_reg_low));
-        printf("After load high: %llx\n", nvbit_read_reg(target_reg_high));
       } else {
         // store here
         void *ptr = (void *)addr;

@@ -49,16 +49,35 @@ void read_file(string filename) {
 	string op;
 	string type;
 
+	unordered_map<int, multiset<Access*, Acc_compare> > thread_pairs;
+
 	while (file >> timestamp) {
 		Access *acc = new Access;
 		acc->timestamp = timestamp;
-        string temp;
+        	string temp;
 		file >> acc->address >> acc->thread_id >> op >> type >> temp;
-        acc->value = std::stoull(temp, nullptr, 0);
+        	acc->value = std::stoull(temp, nullptr, 0);
 		acc->load = (op == "L");
 		acc->shared = (type == "S");
 
-		accs[acc->address].insert(acc);
+		if (acc->load) {
+			thread_pairs[acc->thread_id].insert(acc);
+		} else {
+			accs[acc->address].insert(acc);
+		}
+
+	}
+
+	for (auto map_it = thread_pairs.begin(); map_it != thread_pairs.end(); map_it++) {
+		for (auto it = map_it->second.begin(); it != map_it->second.end(); it++) {
+			Access* temp = *it;
+			it++;
+			Access* just_value = *it;
+
+			temp->value = just_value->value;
+			accs[temp->address].insert(temp);
+		}
+		map_it->second.clear();
 	}
 
 	return;
@@ -93,6 +112,18 @@ void find_dependencies(string output_file) {
 	return;
 }
 
+void clear_map() {
+	for (auto map_it = accs.begin(); map_it != accs.end(); map_it++) {
+		for (auto it = map_it->second.begin(); it != map_it->second.end(); it++) {
+			Access* temp = *it;
+			delete temp;
+		}
+	}
+	accs.clear();
+	return;
+}
+
+
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		cout << "Expecting filename(s) as argument" << endl;
@@ -108,7 +139,7 @@ int main(int argc, char *argv[]) {
 
 		read_file(infile);
 
-		for (auto i = accs.begin(); i != accs.end(); i++) {
+		/*for (auto i = accs.begin(); i != accs.end(); i++) {
 			cout << i->first;
 			auto it = i->second.begin();
 			auto end = i->second.end();
@@ -116,12 +147,13 @@ int main(int argc, char *argv[]) {
 				cout << *(*it) << " ";
 			}
 			cout << endl;
-		}
+		}*/
 		
 		auto begin = infile.find_last_of("/");
 		auto end = infile.find_last_of(".");
 		string outfile = "dependency_output/" + infile.substr(begin + 1, end - begin - 1) + ".dependencies";
 		find_dependencies(outfile);
+		clear_map();
 	}
 
 	return 0;
