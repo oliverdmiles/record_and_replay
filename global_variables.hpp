@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* Channel used to communicate from GPU to CPU receiving thread */
-#define CHANNEL_SIZE (1l << 20)
+#define CHANNEL_SIZE (1l << 30)
 static __managed__ ChannelDev channel_dev;
 static ChannelHost channel_host;
 

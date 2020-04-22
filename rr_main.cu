@@ -86,7 +86,7 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
-    if (verbose) {
+    if (1) {
       //instr->printDecoded();
       instr->print();
     }
@@ -160,6 +160,7 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
 /* Function used to insert mem_record before every memory instruction
  * Used in nvbit_at_function_first_load */
 void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
+    if (!numDependecies) return;
   const std::vector<Instr *> &instrs = nvbit_get_instrs(ctx, f);
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
@@ -298,7 +299,6 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     // Create host array of device pointers
     fscanf(fptr, "%lu", &numDependecies);
     uint64_t **hostArr = new uint64_t *[numDependecies];
-
     for (uint64_t i = 0; i < numDependecies; ++i) {
       uint64_t addr, num_threads;
       fscanf(fptr, "%lu %lu", &addr, &num_threads);
