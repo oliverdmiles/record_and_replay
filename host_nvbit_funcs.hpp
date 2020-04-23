@@ -23,8 +23,6 @@ void nvbit_at_init() {
   GET_VAR_INT(
       phase, "RECORD_REPLAY_PHASE", 0,
       "if unset, executes record phase. Otherwise, executes replay phase");
-  GET_VAR_STR(record_file, "RECORD_FILE",
-              "Name of the file where record output will be written");
   std::string pad(100, '-');
   printf("%s\n", pad.c_str());
 }

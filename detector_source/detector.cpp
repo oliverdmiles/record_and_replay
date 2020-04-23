@@ -56,7 +56,12 @@ void read_file(string filename) {
 		acc->timestamp = timestamp;
         	string temp;
 		file >> acc->address >> acc->thread_id >> op >> type >> temp;
-        	acc->value = std::stoull(temp, nullptr, 0);
+		try {
+        		acc->value = std::stoull(temp, nullptr, 0);
+		} catch (...) {
+			cout << temp << endl;
+			exit(1);
+		}
 		acc->load = (op == "L");
 		acc->shared = (type == "S");
 
@@ -69,8 +74,10 @@ void read_file(string filename) {
 	}
 
 	for (auto map_it = thread_pairs.begin(); map_it != thread_pairs.end(); map_it++) {
+		cout << map_it->second.size() << endl;
 		for (auto it = map_it->second.begin(); it != map_it->second.end(); it++) {
 			Access* temp = *it;
+			cout << temp->address << endl;
 			it++;
 			Access* just_value = *it;
 
@@ -92,11 +99,20 @@ void find_dependencies(string output_file) {
 
 	set<Access*, Acc_compare> dependencies;
 	for (auto map_it = accs.begin(); map_it != accs.end(); map_it++) {
-		//if (map_it->second.size() > 1) {
-			dependencies.insert(*map_it->second.begin());
-		//}
+		if (map_it->second.size() == 1) continue;
+		// check if there's a store
+		bool store = false;
+		for (auto it = map_it->second.begin(); it != map_it->second.end(); it++) {
+			if (!(*it)->load) {
+				store = true;
+				break;
+			}
+		}
+		if (!store) continue;
+		dependencies.insert(*map_it->second.begin());
 	}
 	file << dependencies.size() << endl;
+	cout << dependencies.size() << endl;
 
 	for (auto acc = dependencies.begin(); acc != dependencies.end(); acc++) {
 		uint64_t addr = (*acc)->address;

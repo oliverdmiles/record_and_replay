@@ -86,19 +86,18 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
-    if (1) {
-      //instr->printDecoded();
-      instr->print();
+    if (verbose) {
+      instr->printDecoded();
     }
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
         !isInstrOfInterest(instr)) {
       cnt++;
       continue;
     }
-
     if (instr->getMemOpType() == Instr::memOpType::SHARED ||
-        instr->getMemOpType() == Instr::memOpType::GLOBAL) {
-
+        instr->getMemOpType() == Instr::memOpType::GLOBAL ||
+        instr->getMemOpType() == Instr::memOpType::GENERIC) {
+      instr->print();
       /* Instrument loads before and after. Instrument stores before. */
       for (int i = 0; i < 2; ++i) {
         uint32_t op_type = 0;
@@ -109,9 +108,11 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         if (instr->getMemOpType() == Instr::memOpType::GLOBAL)
           op_type = 2;
         if (instr->isLoad()) {
+          printf("Here is the load\n");
           nvbit_insert_call(instr, "mem_record", (ipoint_t)i);
           op_type |= 1;
         } else if (i == 0) { /* if i = 0, then we are instrumenting before */
+          printf("Here is the store\n");
           nvbit_insert_call(instr, "mem_record", (ipoint_t)i);
         }
         op_type <<= 30;
@@ -160,7 +161,10 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
 /* Function used to insert mem_record before every memory instruction
  * Used in nvbit_at_function_first_load */
 void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
-    if (!numDependecies) return;
+  if (!numDependecies) {
+    return;
+  }
+    
   const std::vector<Instr *> &instrs = nvbit_get_instrs(ctx, f);
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
@@ -264,8 +268,8 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
         uint32_t tid = rd.type_load_tid & 0x3fffffff;
         char type = (rd.type_load_tid & (uint32_t)(1 << 31)) ? 'G' : 'S';
         char load = (rd.type_load_tid & (1 << 30)) ? 'L' : 'S';
-        fprintf(fptr, "%u %lu %d %c %c %p\n", time, rd.addr, tid, load, type,
-                rd.value.u64);
+        fprintf(fptr, "%u %lu %d %c %c 0x%llx\n", time, rd.addr, tid, load,
+                type, rd.value.u64);
       } else {
         // TODO: Add in when ready
         // uint32_t tid = rd.type_load_tid & 0x0fffffff;
@@ -311,7 +315,7 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
       uint64_t curr_thread;
       char load_or_store;
       uint64_t value;
-      for (uint64_t j = 0; j < 3*num_threads; j += 3) {
+      for (uint64_t j = 0; j < 3 * num_threads; j += 3) {
         fscanf(fptr, "%lu %s %llx", &curr_thread, &load_or_store, &value);
         subArray[NUM_METADATA + j] = curr_thread;
         if (load_or_store == 'L') {
@@ -335,7 +339,8 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     // Copy to a device array of device pointers
     CUDA_SAFECALL(cudaMalloc(&deviceArr, numDependecies * sizeof(uint64_t *)));
 
-    CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr, numDependecies * sizeof(uint64_t *),
+    CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr,
+                             numDependecies * sizeof(uint64_t *),
                              cudaMemcpyHostToDevice));
 
     delete[] hostArr;

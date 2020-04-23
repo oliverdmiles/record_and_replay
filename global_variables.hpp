@@ -35,7 +35,6 @@ uint32_t instr_begin_interval = 0;
 uint32_t instr_end_interval = UINT32_MAX;
 int verbose = 0;
 int phase = 0;
-std::string record_file = "recorded_data.txt";
 FILE *fptr;
 
 /* information collected in the instrumentation function */

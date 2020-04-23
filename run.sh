@@ -8,6 +8,8 @@
 # See https://vaneyckt.io/posts/safer_bash_scripts_with_set_euxo_pipefail/
 set -Eeuo pipefail
 
+RR_DIR=/home/omiles/582/record_and_replay
+
 usage() {
     echo 'USAGE: ./run.sh EXEC [OPTIONS] '
     echo ''
@@ -24,7 +26,7 @@ usage() {
 record() {
     rm -rf record_output
     mkdir record_output
-    export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
+    export LD_PRELOAD=$RR_DIR/output/record_and_replay.so
     RECORD_REPLAY_PHASE=0 NOBANNER=1 $FULL_EXEC
 }
 
@@ -32,11 +34,11 @@ filter() {
     export LD_PRELOAD=
     rm -rf dependency_output
     mkdir dependency_output
-    $CURRENT_DIR/detector $CURRENT_DIR/record_output/*
+    $RR_DIR/detector $CURRENT_DIR/record_output/*
 }
 
 replay() {
-    export LD_PRELOAD=$CURRENT_DIR/output/record_and_replay.so
+    export LD_PRELOAD=$RR_DIR/output/record_and_replay.so
     RECORD_REPLAY_PHASE=1 NOBANNER=1 $FULL_EXEC
 }
 

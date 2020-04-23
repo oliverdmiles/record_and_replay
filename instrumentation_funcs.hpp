@@ -74,6 +74,7 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high,
     return;
   }
 
+  printf("hello!\n");
   int active_mask = __ballot(1);
   const int laneid = get_laneid();
 
@@ -88,7 +89,6 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high,
   bool isDependent = false;
   uint64_t depIdx = 0;
 
-  // printf("Started thread %d\n", threadID);
   for (uint64_t i = 0; i < numDependecies; ++i) {
     if (deviceArr[i][0] == addr) {
       depIdx = i;
@@ -97,7 +97,7 @@ mem_replay(int pred, uint32_t is_extended, uint32_t reg_high,
     }
   }
   if (!isDependent) {
-    printf("No instructions match: %lu\n", addr);
+    printf("No addresses match: %lu\n", addr);
     return;
   }
 
