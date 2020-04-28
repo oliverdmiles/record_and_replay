@@ -50,7 +50,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \documentclass[letterpaper,twocolumn,10pt]{article}
-\usepackage{usenix2019_v3}
+\usepackage{unix}
 
 % to be able to draw some self-contained figs
 \usepackage{tikz}
@@ -93,37 +93,86 @@
 
 %for single author (just remove % characters)
 \author{
-{\rm Your N.\ Here}\\
-Your Institution
+{\rm Sabrina\ Brogren}\\
+University of Michigan
 \and
-{\rm Second Name}\\
-Second Institution
-% copy the following lines to add more authors
-% \and
-% {\rm Name}\\
-%Name Institution
+{\rm Christina Foshiem-Hoag}\\
+University of Michigan
+\and
+{\rm Oliver Miles}\\
+University of Michigan
 } % end author
 
 \maketitle
 
 %-------------------------------------------------------------------------------
-\begin{abstract}
+\begin{abstract} % 2-3 paragraphs
 %-------------------------------------------------------------------------------
-Your abstract text goes here. Just a few facts. Whet our appetites.
-Not more than 200 words, if possible, and preferably closer to 150.
+Multithreaded programs suffer from nondeterministic behavior ranging from data races to uninitialized variables. GPU programs are especially vulnerable to bugs related to nondeterministic behavior due to their high level of paralellization. 
+These bugs can be especially difficult to catch, as merely running the program again with the same inputs does not guarantee that the bug will rear its head again. 
+Frameworks like PinPlay and Instant Replay allow a user to record and deterministically replay a program, but no tool yet exists with the same functionality for GPU programs. 
+
+
+Our goal is to create a tool that allows a user to capture the execution of their GPU program and replay the execution. 
+The source of nondeterminism we're focusing on is data races. 
+We want to be able to replay a GPU program such that not only do threads interacting with memory run in the same order, but also the state of memory throughout the program is identical to when it was recorded. 
+We used NVBit (NVidia Binary Instrumentation Tool) to instrument instructions that operate on memory (loads and stores). 
+On record, we record all loads and stores. 
+On replay, we use locks to replay the loads and stores for each memory address in order. 
+This paper will describe the describes the design of our tool, as well as discusses its usage on racey GPU programs.
+We hope our tool will serve as a proof of concept for further endeavors into GPU record and replay tools.
 \end{abstract}
 
 
 %-------------------------------------------------------------------------------
-\section{Introduction}
+\section{Introduction - 1 page}
 %-------------------------------------------------------------------------------
 
-A paragraph of text goes here. Lots of text. Plenty of interesting
-text. Text text text text text text text text text text text text text
-text text text text text text text text text text text text text text
-text text text text text text text text text text text text text text
-text text text text text text text.
-More fascinating text. Features galore, plethora of promises.
+"Define and motivate the problem with examples, briefly talk about challenges. 
+Explain your core high-level idea. 
+Give an overview of your solution and summarize key results"
+Discuss other solutions (none exist). Talk about other kinds of nondeterminism like multiple kernals, uninitialized memory. Describe the core concept, which is to get all values when recording and replay them in order.
+
+%-------------------------------------------------------------------------------
+\section{Design - 3 pages}
+%-------------------------------------------------------------------------------
+Using NVBit and Cuda.
+What was instrumented and recorded?
+What challenges did we face? (ASLR, had to use a count to keep track of order when recording, had to implement our own locks, needed to manually replay loads and stores to make sure order is maintained)
+What other design decisions have we considered (replaying just by inserting data values, but not maintaining ordering. This gives us the same output from a program, but does not replay memory as well.)
+
+%-------------------------------------------------------------------------------
+\section{Implementation - 0.5 page}
+%-------------------------------------------------------------------------------
+
+"Explain subtle implementation details"
+
+%-------------------------------------------------------------------------------
+\section{Evaluation}
+%-------------------------------------------------------------------------------
+
+"Convince the reader that your system works and explain when it fails"
+8-9 benchmarks
+discuss overhead (maybe look at overhead with only loads/only stores)
+
+%-------------------------------------------------------------------------------
+\section{Related Work - 0.5-1 page}
+%-------------------------------------------------------------------------------
+
+Pin-Play
+How is our work the same? How is it the same? What ideas were adopted from other works?
+
+%-------------------------------------------------------------------------------
+\section{Discussion - 0.5 page}
+%-------------------------------------------------------------------------------
+
+"Discuss your limitations and possible workarounds"
+
+%-------------------------------------------------------------------------------
+\section{Conclusion - 2-3 paragraphs}
+%-------------------------------------------------------------------------------
+
+"Summarize your paper and breifly point out the future work"
 
 %-------------------------------------------------------------------------------
 \section{Footnotes, Verbatim, and Citations}
