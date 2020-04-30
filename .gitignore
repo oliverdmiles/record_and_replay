@@ -1,0 +1,6 @@
+record-output/*
+dependency-output/*
+racey/*.global
+racey/*.shared
+output/*
+.vscode
