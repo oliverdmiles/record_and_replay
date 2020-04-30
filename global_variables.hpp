@@ -81,8 +81,4 @@ __device__ uint32_t count = 0;
 /* Synchronization variables */
 __device__ int mutex = 0;
 
-__managed__ unsigned int resolved = 0;
-
-unsigned long number_of_deps;
-
 #endif

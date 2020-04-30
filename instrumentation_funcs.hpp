@@ -30,28 +30,27 @@ mem_record(int pred, uint32_t op_type, uint32_t reg_high,
   uint64_t val = (uint64_t)((uint32_t)(nvbit_read_reg(target_reg_low)));
   if (target_reg_low != 255) {
     val = (((uint64_t)((uint32_t)(nvbit_read_reg(target_reg_high)))) << 32) |
-                   ((uint64_t)((uint32_t)(nvbit_read_reg(target_reg_low))));
+          ((uint64_t)((uint32_t)(nvbit_read_reg(target_reg_low))));
   }
-  
+
   uint32_t is_extended = op_type & 0x1;
   uint32_t threadID = get_TID();
   val = is_extended ? val : val & 0xffffffff;
   uint32_t size = (op_type >> 28) & 3;
 
-  //size is actually 4
-  if (size == 2) 
+  /* size is actually 4 */
+  if (size == 2)
     val &= 0xFFFFFFFF;
-  //size is actually 2
+  /* size is actually 2 */
   else if (size == 1)
     val &= 0xFFFF;
-  //size is actually 1
+  /* size is actually 1 */
   else if (size == 0)
     val &= 0xFF;
 
   record_data rd;
   rd.addr = addr;
   rd.value.u64 = val;
-  rd.is_mem_instr = true;
   rd.time = atomicInc(&count, 4294967295);
   rd.type_load_tid = (op_type & 0xFFFFFFFE) | threadID;
   channel_dev.push(&rd, sizeof(record_data));
@@ -91,8 +90,6 @@ mem_replay(int pred, uint32_t op_info, uint32_t reg_high,
     return;
   }
 
-
-
   while (waiting) {
     uint64_t numThreadNext = deviceArr[depIdx][2];
     if (numThreadNext == deviceArr[depIdx][1]) {
@@ -115,11 +112,10 @@ mem_replay(int pred, uint32_t op_info, uint32_t reg_high,
         }
       } else {
         void *ptr = (void *)addr;
-        if (size > 4) { 
+        if (size > 4) {
           *(uint64_t *)(ptr) =
               ((uint64_t)value_high << 32) | (uint64_t)value_low;
-        }
-        else if (size == 4) {
+        } else if (size == 4) {
           *(uint32_t *)(ptr) = (uint32_t)value_low;
         } else if (size == 2) {
           *(uint16_t *)(ptr) = (uint16_t)value_low;
@@ -131,7 +127,6 @@ mem_replay(int pred, uint32_t op_info, uint32_t reg_high,
       /* END OF WRITING OR READING */
       deviceArr[depIdx][2] += 1;
       waiting = false;
-      atomicInc(&resolved, 4294967295);
       unlock();
     }
   }

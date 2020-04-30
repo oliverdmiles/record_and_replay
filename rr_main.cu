@@ -259,17 +259,14 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
 
     std::string filename = "dependency_output/" + std::to_string(file_prefix) +
                            "_" + std::to_string(file_suffix) + ".dependencies";
-    number_of_deps = 0;
-    resolved = 0;
     fptr = fopen(filename.c_str(), "r");
 
-    // Create host array of device pointers
+    /* Create host array of device pointers */
     fscanf(fptr, "%lu", &numDependecies);
     hostArr = new uint64_t *[numDependecies];
     for (uint64_t i = 0; i < numDependecies; ++i) {
       uint64_t addr, num_threads;
       fscanf(fptr, "%lx %lu", &addr, &num_threads);
-      number_of_deps += num_threads;
       uint64_t numSpots = 3 * num_threads + NUM_METADATA;
       uint64_t *subArray = new uint64_t[numSpots];
       subArray[0] = addr;
@@ -300,7 +297,7 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
       delete[] subArray;
     }
 
-    // Copy to a device array of device pointers
+    /* Copy to a device array of device pointers */
     CUDA_SAFECALL(cudaMalloc(&deviceArr, numDependecies * sizeof(uint64_t *)));
 
     CUDA_SAFECALL(cudaMemcpy(deviceArr, hostArr,
@@ -320,7 +317,5 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     delete[] hostArr;
     CUDA_SAFECALL(cudaFree(deviceArr));
     assert(cudaGetLastError() == cudaSuccess);
-    printf("Finished replay of %lu deps with this linearized %lu and this many actually resolved %d\n",numDependecies, number_of_deps, resolved);
-
   }
 }
