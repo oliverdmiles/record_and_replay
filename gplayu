@@ -44,7 +44,7 @@ usage() {
     printf '       EXEC                    path to the executable to record and replay\n'
     printf 'Options:\n'
     printf '       -r1, --record           only run the record phase\n'
-    printf '        -f, --filter           only run the data cleaning phase\n'
+    printf '       -fl, --filter           only run the data cleaning phase\n'
     printf '       -r2, --replay           only run the replay phase\n'
     printf '        -c, --check-output     save and compare output from record and replay\n'
     printf '        -t, --time             times EXEC with and without instrumentation\n'
@@ -199,36 +199,48 @@ time_runs() {
     printf "Finished!\n\n\n"
 
     printf "Timing Instrumented Executable...\n"
-    { time full_run ; } 2> instr_time
+    { time record ; } 2> record_time
+    { time filter ; } 2> filter_time
+    { time replay ; } 2> replay_time
     printf "Finished!\n\n\n"
 
     # Print the results of timing
     printf "Runtime without instrumentation:\n"
     tail -3 orig_time
-
     printf "\n"
 
-    printf "Runtime with instrumentation:\n"
-    tail -3 instr_time
-
+    printf "Runtime for record:\n"
+    tail -3 record_time
     printf "\n"
 
-    printf "Percent Overhead:\n"
+    printf "Runtime for filter:\n"
+    tail -3 filter_time
+    printf "\n"
+
+    printf "Runtime for replay:\n"
+    tail -3 replay_time
+    printf "\n"
+
     TimeCategorites=( "real" "user" "sys" )
-    for time_cat in "${TimeCategorites[@]}"; do
-        ORIG_MINUTES="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f1)"
-        ORIG_SECONDS="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
-        ORIG_TOTAL=$(awk "BEGIN {print $ORIG_MINUTES*60 + $ORIG_SECONDS; exit}")
+    Files=( "record" "replay" )
+    for file in "${Files[@]}"; do
+        printf "Percent overhead for $file:\n"
+        for time_cat in "${TimeCategorites[@]}"; do
+            ORIG_MINUTES="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f1)"
+            ORIG_SECONDS="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
+            ORIG_TOTAL=$(awk "BEGIN {print $ORIG_MINUTES*60 + $ORIG_SECONDS; exit}")
 
-        INSTR_MINUTES="$(grep "$time_cat" instr_time | cut  -f2 | cut -d "m" -f1)"
-        INSTR_SECONDS="$(grep "$time_cat" instr_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
-        INSTR_TOTAL=$(awk "BEGIN {print $INSTR_MINUTES*60 + $INSTR_SECONDS; exit}")
+            NEW_MINUTES="$(grep "$time_cat" "$file"_time | cut  -f2 | cut -d "m" -f1)"
+            NEW_SECONDS="$(grep "$time_cat" "$file"_time  | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
+            NEW_TOTAL=$(awk "BEGIN {print $NEW_MINUTES*60 + $NEW_SECONDS; exit}")
 
-        OVERHEAD=$(awk "BEGIN {print (($INSTR_TOTAL - $ORIG_TOTAL) / $ORIG_TOTAL) * 100; exit}")
-        printf "$time_cat\t$OVERHEAD%%\n"
+            OVERHEAD=$(awk "BEGIN {print (($NEW_TOTAL - $ORIG_TOTAL) / $ORIG_TOTAL) * 100; exit}")
+            printf "$time_cat\t$OVERHEAD%%\n"
+        done
+        printf "\n"
     done
 
-    rm orig_time instr_time
+    rm orig_time record_time filter_time replay_time
 }
 
 # Check if too many options are being specified 
