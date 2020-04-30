@@ -49,30 +49,6 @@
 #include "host_nvbit_funcs.hpp"
 #include "instrumentation_funcs.hpp"
 
-std::string getOpcodeBase(Instr *instr) {
-  std::string opcode = instr->getOpcode();
-  std::size_t first_dot = opcode.find(".");
-  if (first_dot != std::string::npos) {
-    opcode = opcode.erase(first_dot);
-  }
-  return opcode;
-}
-
-bool isInstrOfInterest(Instr *instr) {
-  /* Memory instructions */
-  if (instr->getMemOpType() != Instr::NONE) {
-    return true;
-  }
-
-  /* Synchronization operations */
-  std::string opcode = getOpcodeBase(instr);
-  if (sync_instrs_to_id.find(opcode) != sync_instrs_to_id.end()) {
-    return true;
-  }
-
-  return false;
-}
-
 uint64_t getFunctionHash(CUcontext ctx, cuLaunchKernel_params *p) {
   std::string func_name(nvbit_get_func_name(ctx, p->f));
   std::hash<std::string> func_hasher;
@@ -86,18 +62,21 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
-    if (verbose) {
-      instr->printDecoded();
+    if (verbose == 2) {
+      instr->print();
     }
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
-        !isInstrOfInterest(instr)) {
+        instr->getMemOpType() == Instr::memOpType::NONE) {
       cnt++;
       continue;
     }
     if (instr->getMemOpType() == Instr::memOpType::SHARED ||
         instr->getMemOpType() == Instr::memOpType::GLOBAL ||
         instr->getMemOpType() == Instr::memOpType::GENERIC) {
-      instr->print();
+      if (verbose == 1) {
+        instr->print();
+        printf("^ size is %d\n", instr->getSize());
+      }
       /* Instrument loads before and after. Instrument stores before. */
       for (int i = 0; i < 2; ++i) {
         uint32_t op_type = 0;
@@ -108,20 +87,22 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         if (instr->getMemOpType() == Instr::memOpType::GLOBAL)
           op_type = 2;
         if (instr->isLoad()) {
-          printf("Here is the load\n");
           nvbit_insert_call(instr, "mem_record", (ipoint_t)i);
           op_type |= 1;
         } else if (i == 0) { /* if i = 0, then we are instrumenting before */
-          printf("Here is the store\n");
           nvbit_insert_call(instr, "mem_record", (ipoint_t)i);
         }
-        op_type <<= 30;
+        op_type <<= 2;
+        uint8_t size = 0;
+        for (int i = instr->getSize() - 1; i; i >>= 1, size++)
+          ;
+        op_type |= size;
+        op_type <<= 28;
         if (instr->isExtended()) {
           op_type |= 0x1;
         }
         nvbit_add_call_arg_pred_val(instr);
         nvbit_add_call_arg_const_val32(instr, op_type);
-
         const Instr::operand_t *op0 = instr->getOperand(0);
         const Instr::operand_t *op1 = instr->getOperand(1);
         const Instr::operand_t *temp = op0;
@@ -145,14 +126,6 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
         nvbit_add_call_arg_const_val32(instr, cnt);
       }
-
-    } else if (instr->getMemOpType() == Instr::memOpType::NONE) {
-      // nvbit_insert_call(instr, "sync_record", IPOINT_BEFORE);
-      // nvbit_add_call_arg_pred_val(instr);
-
-      // uint32_t optype = sync_instrs_to_id.at(getOpcodeBase(instr)) << 28;
-
-      // nvbit_add_call_arg_const_val32(instr, optype);
     }
     cnt++;
   }
@@ -161,31 +134,31 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
 /* Function used to insert mem_record before every memory instruction
  * Used in nvbit_at_function_first_load */
 void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
-  if (!numDependecies) {
-    return;
-  }
-    
   const std::vector<Instr *> &instrs = nvbit_get_instrs(ctx, f);
   uint32_t cnt = 0;
   /* iterate on all the static instructions in the function */
   for (auto instr : instrs) {
-    // instr->print();
+    if (verbose == 2) {
+      instr->print();
+    }
     if (cnt < instr_begin_interval || cnt >= instr_end_interval ||
-        !isInstrOfInterest(instr)) {
+        instr->getMemOpType() == Instr::memOpType::NONE) {
       cnt++;
       continue;
     }
-    if (verbose) {
-      instr->printDecoded();
-    }
 
     if (instr->getMemOpType() == Instr::memOpType::SHARED ||
-        instr->getMemOpType() == Instr::memOpType::GLOBAL) {
+        instr->getMemOpType() == Instr::memOpType::GLOBAL ||
+        instr->getMemOpType() == Instr::memOpType::GENERIC) {
+      if (verbose == 1) {
+        instr->printDecoded();
+        printf("^ size is %d\n", instr->getSize());
+      }
       nvbit_insert_call(instr, "mem_replay", IPOINT_BEFORE);
       nvbit_add_call_arg_pred_val(instr);
 
-      uint32_t is_extended = instr->isExtended();
-      nvbit_add_call_arg_const_val32(instr, is_extended);
+      uint32_t op_info = (instr->isExtended() << 4) | instr->getSize();
+      nvbit_add_call_arg_const_val32(instr, op_info);
 
       const Instr::operand_t *op0 = instr->getOperand(0);
       const Instr::operand_t *op1 = instr->getOperand(1);
@@ -210,10 +183,6 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
       /* immediate */
       nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
       nvbit_add_call_arg_const_val32(instr, cnt);
-
-      nvbit_remove_orig(instr);
-
-    } else if (instr->getMemOpType() == Instr::memOpType::NONE) {
     }
     cnt++;
   }
@@ -225,7 +194,6 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
                              cuLaunchKernel_params *p) {
   if (!is_exit) {
     recv_thread_receiving = true;
-
   } else {
     /* make sure current kernel is completed */
     cudaDeviceSynchronize();
@@ -263,19 +231,12 @@ void handleRecordKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     for (size_t i = 0; i < accesses.size(); ++i) {
       record_data rd = accesses[i];
       uint32_t time = (uint32_t)rd.time;
-      if (rd.is_mem_instr) {
-        // uint32_t base_tid = rd.type_load_tid & 0x3fffffff;
-        uint32_t tid = rd.type_load_tid & 0x3fffffff;
-        char type = (rd.type_load_tid & (uint32_t)(1 << 31)) ? 'G' : 'S';
-        char load = (rd.type_load_tid & (1 << 30)) ? 'L' : 'S';
-        fprintf(fptr, "%u %lu %d %c %c 0x%llx\n", time, rd.addr, tid, load,
-                type, rd.value.u64);
-      } else {
-        // TODO: Add in when ready
-        // uint32_t tid = rd.type_load_tid & 0x0fffffff;
-        // std::string opcode = id_to_sync_instrs.at(rd.type_load_tid >> 28);
-        // fprintf(fptr, "SYNC! %u %d %s\n", time, base_tid, opcode.c_str());
-      }
+      uint32_t tid = rd.type_load_tid & 0x07ffffff;
+      char type = (rd.type_load_tid & (uint32_t)(1 << 31)) ? 'G' : 'S';
+      char load = (rd.type_load_tid & (1 << 30)) ? 'L' : 'S';
+      uint8_t size = 1 << ((rd.type_load_tid >> 28) & 3);
+      fprintf(fptr, "%u 0x%lx %d %c %c %d 0x%lx\n", time, rd.addr, tid, load,
+              type, size, rd.value.u64);
     }
     fclose(fptr);
 
@@ -298,14 +259,17 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
 
     std::string filename = "dependency_output/" + std::to_string(file_prefix) +
                            "_" + std::to_string(file_suffix) + ".dependencies";
+    number_of_deps = 0;
+    resolved = 0;
     fptr = fopen(filename.c_str(), "r");
 
     // Create host array of device pointers
     fscanf(fptr, "%lu", &numDependecies);
-    uint64_t **hostArr = new uint64_t *[numDependecies];
+    hostArr = new uint64_t *[numDependecies];
     for (uint64_t i = 0; i < numDependecies; ++i) {
       uint64_t addr, num_threads;
-      fscanf(fptr, "%lu %lu", &addr, &num_threads);
+      fscanf(fptr, "%lx %lu", &addr, &num_threads);
+      number_of_deps += num_threads;
       uint64_t numSpots = 3 * num_threads + NUM_METADATA;
       uint64_t *subArray = new uint64_t[numSpots];
       subArray[0] = addr;
@@ -316,7 +280,7 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
       char load_or_store;
       uint64_t value;
       for (uint64_t j = 0; j < 3 * num_threads; j += 3) {
-        fscanf(fptr, "%lu %s %llx", &curr_thread, &load_or_store, &value);
+        fscanf(fptr, "%lu %s %lx", &curr_thread, &load_or_store, &value);
         subArray[NUM_METADATA + j] = curr_thread;
         if (load_or_store == 'L') {
           subArray[NUM_METADATA + j + 1] = 1;
@@ -343,15 +307,20 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
                              numDependecies * sizeof(uint64_t *),
                              cudaMemcpyHostToDevice));
 
-    delete[] hostArr;
-
     fclose(fptr);
   } else {
     /* make sure current kernel is completed */
     cudaDeviceSynchronize();
     assert(cudaGetLastError() == cudaSuccess);
 
+    for (uint64_t i = 0; i < numDependecies; ++i) {
+      CUDA_SAFECALL(cudaFree(hostArr[i]));
+      assert(cudaGetLastError() == cudaSuccess);
+    }
+    delete[] hostArr;
     CUDA_SAFECALL(cudaFree(deviceArr));
     assert(cudaGetLastError() == cudaSuccess);
+    printf("Finished replay of %lu deps with this linearized %lu and this many actually resolved %d\n",numDependecies, number_of_deps, resolved);
+
   }
 }

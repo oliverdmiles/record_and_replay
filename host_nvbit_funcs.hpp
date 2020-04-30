@@ -63,6 +63,9 @@ void nvbit_at_ctx_init(CUcontext ctx) {
     channel_host.init(0, CHANNEL_SIZE, &channel_dev, NULL);
     pthread_create(&recv_thread, NULL, recv_thread_fun, NULL);
   }
+  else {
+    channel_host.init(0, CHANNEL_SIZE, &channel_dev, NULL);
+  }
 }
 
 void nvbit_at_ctx_term(CUcontext ctx) {
