@@ -34,6 +34,7 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include <regex>
 
 /* every tool needs to include this once */
 #include "nvbit_tool.h"
@@ -94,8 +95,11 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         }
         op_type <<= 2;
         uint8_t size = 0;
-        for (int i = instr->getSize() - 1; i; i >>= 1, size++)
-          ;
+        std::string sixtyfour(instr->getSass());
+        if (std::regex_search(sixtyfour, std::regex("\.[uUbBfF]?64")))
+          size = 3;
+        else 
+          for (int i = instr->getSize() - 1; i; i >>= 1, size++);
         op_type |= size;
         op_type <<= 28;
         if (instr->isExtended()) {
@@ -157,7 +161,13 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
       nvbit_insert_call(instr, "mem_replay", IPOINT_BEFORE);
       nvbit_add_call_arg_pred_val(instr);
 
-      uint32_t op_info = (instr->isExtended() << 4) | instr->getSize();
+      uint8_t size = 0;
+      std::string sixtyfour(instr->getSass());
+      if (std::regex_search(sixtyfour, std::regex("\.[uUbBfF]?64")))
+        size = 8;
+      else 
+        size = instr->getSize();
+      uint32_t op_info = (instr->isExtended() << 4) | size;
       nvbit_add_call_arg_const_val32(instr, op_info);
 
       const Instr::operand_t *op0 = instr->getOperand(0);

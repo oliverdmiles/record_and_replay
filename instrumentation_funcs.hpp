@@ -30,21 +30,21 @@ mem_record(int pred, uint32_t op_type, uint32_t reg_high,
   uint64_t val = (uint64_t)((uint32_t)(nvbit_read_reg(target_reg_low)));
   if (target_reg_low != 255) {
     val = (((uint64_t)((uint32_t)(nvbit_read_reg(target_reg_high)))) << 32) |
-          ((uint64_t)((uint32_t)(nvbit_read_reg(target_reg_low))));
+                   ((uint64_t)((uint32_t)(nvbit_read_reg(target_reg_low))));
   }
-
+  
   uint32_t is_extended = op_type & 0x1;
   uint32_t threadID = get_TID();
   val = is_extended ? val : val & 0xffffffff;
   uint32_t size = (op_type >> 28) & 3;
 
-  /* size is actually 4 */
+  //size is actually 4
   if (size == 2)
     val &= 0xFFFFFFFF;
-  /* size is actually 2 */
+  //size is actually 2
   else if (size == 1)
     val &= 0xFFFF;
-  /* size is actually 1 */
+  //size is actually 1
   else if (size == 0)
     val &= 0xFF;
 
@@ -105,9 +105,9 @@ mem_replay(int pred, uint32_t op_info, uint32_t reg_high,
       uint32_t value_high =
           (deviceArr[depIdx][indexOfNextThread + 2] >> 32) & 0xffffffff;
 
-      if (!is_load) {
+      if (!is_load && target_reg_low != 255) {
         nvbit_write_reg(target_reg_low, value_low);
-        if (op_info > 4 && target_reg_low != 255) {
+        if (size > 4) {
           nvbit_write_reg(target_reg_high, value_high);
         }
       } else {
