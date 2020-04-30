@@ -1,6 +1,8 @@
-record-output/*
-dependency-output/*
+record_output/*
+dependency_output/*
 racey/*.global
 racey/*.shared
 output/*
 .vscode
+record-*
+replay-*
