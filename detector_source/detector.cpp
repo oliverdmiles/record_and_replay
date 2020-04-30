@@ -54,12 +54,13 @@ void read_file(string filename) {
 	while (file >> timestamp) {
 		Access *acc = new Access;
 		acc->timestamp = timestamp;
-        	string temp;
-		file >> acc->address >> acc->thread_id >> op >> type >> temp;
+        	string temp_addr, temp_size, temp_val;
+		file >> temp_addr >> acc->thread_id >> op >> type >> temp_size >> temp_val;
 		try {
-        		acc->value = std::stoull(temp, nullptr, 0);
+			acc->address = std::stoull(temp_addr, nullptr, 0);
+        		acc->value = std::stoull(temp_val, nullptr, 0);
 		} catch (...) {
-			cout << temp << endl;
+			cout << "Error reading file" << endl;
 			exit(1);
 		}
 		acc->load = (op == "L");
@@ -74,10 +75,8 @@ void read_file(string filename) {
 	}
 
 	for (auto map_it = thread_pairs.begin(); map_it != thread_pairs.end(); map_it++) {
-		cout << map_it->second.size() << endl;
 		for (auto it = map_it->second.begin(); it != map_it->second.end(); it++) {
 			Access* temp = *it;
-			cout << temp->address << endl;
 			it++;
 			Access* just_value = *it;
 
@@ -88,6 +87,37 @@ void read_file(string filename) {
 	}
 
 	return;
+}
+
+void compress_dependencies() {
+	// check if all operations on a certain address are from the same thread
+	for (auto map_it = accs.begin(); map_it != accs.end(); ) {
+		auto it = map_it->second.begin();
+		int thread_id = (*it)->thread_id;
+		uint64_t value = (*it)->value;
+		bool same_thread = true;
+		bool same_value = true;
+		for (; it != map_it->second.end(); it++) {
+			if ((*it)->thread_id != thread_id) {
+				same_thread = false;
+			}
+			if ((*it)->value != value) {
+				same_value = false;
+			}
+			
+		}
+
+		auto to_erase = map_it++;
+
+		if (same_thread || same_value) {
+			for (auto it = to_erase->second.begin(); it != to_erase->second.end(); it++) {
+				Access* temp = *it;
+				delete temp;
+			}
+			accs.erase(to_erase);
+		}
+
+	}
 }
 
 void find_dependencies(string output_file) {
@@ -112,11 +142,9 @@ void find_dependencies(string output_file) {
 		dependencies.insert(*map_it->second.begin());
 	}
 	file << dependencies.size() << endl;
-	cout << dependencies.size() << endl;
-
 	for (auto acc = dependencies.begin(); acc != dependencies.end(); acc++) {
 		uint64_t addr = (*acc)->address;
-		file << addr << " " << accs[addr].size();
+		file << "0x" << std::hex << addr << std::dec << " " << accs[addr].size();
 		auto end = accs[addr].end();
 		for (auto it = accs[addr].begin(); it != end; it++) {
 			file << " " << (*it)->thread_id << " " << ((*it)->load ? "L" : "S");
@@ -168,6 +196,7 @@ int main(int argc, char *argv[]) {
 		auto begin = infile.find_last_of("/");
 		auto end = infile.find_last_of(".");
 		string outfile = "dependency_output/" + infile.substr(begin + 1, end - begin - 1) + ".dependencies";
+		compress_dependencies();
 		find_dependencies(outfile);
 		clear_map();
 	}
