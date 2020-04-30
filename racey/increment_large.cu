@@ -2,12 +2,10 @@
 #include <stdio.h>
 #include <thread>
 
-__managed__ unsigned int w = 0x0;
-__managed__ unsigned int x = 0xac093f74;
-__managed__ unsigned int y = 0xc4389017;
-__managed__ unsigned char z = 0x1;
+__managed__ unsigned long x = 0xb456ac093f74;
+__managed__ unsigned long y = 0xcd1e04389017;
 
-__global__ void atomic_kernel() {
+__global__ void atomic_kernel(char *temp, short test) {
   uint32_t blockID =
       blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
   uint32_t threadID = blockID * (blockDim.x * blockDim.y * blockDim.z) +
@@ -26,28 +24,18 @@ __global__ void atomic_kernel() {
   } else {
     y = y + x;
   }
-  unsigned char temp = 0x0;
-  if (threadID == 0) {
-    temp = z;
-    printf("char is %x\n", temp);
-    w = 0x1;
-  }
 }
 
 int main() {
-  printf("Before running kernel:\n");
-  printf("    w: %x\n", w);
-  printf("    x: %x\n", x);
-  printf("    y: %x\n", y);
-  printf("    z: %x\n", z);
-  atomic_kernel<<<BLOCKS, THREADS>>>();
+  printf("Before running kernel\n");
+  printf("    x: %llx\n", x);
+  printf("    y: %llx\n", y);
+  atomic_kernel<<<BLOCKS, THREADS>>>(0, 5);
   // std::this_thread::sleep_for(std::chrono::seconds(1));
   cudaDeviceSynchronize();
   cudaDeviceReset();
-  printf("After running kernel:\n");
-  printf("    w: %x\n", w);
-  printf("    x: %x\n", x);
-  printf("    y: %x\n", y);
-  printf("    z: %x\n", z);
+  printf("After running kernel\n");
+  printf("    x: %llx\n", x);
+  printf("    y: %llx\n", y);
   return 0;
 }
