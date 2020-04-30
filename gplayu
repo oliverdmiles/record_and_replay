@@ -1,0 +1,351 @@
+#!/bin/bash
+#
+# gplayu
+#
+# A comprehensive script to run the GPlayU record and replay software on GPU 
+# executables. Users can run all stages -- record data, filter recorded output 
+# into data depenndencies, and replay dependencies -- or single stages. In 
+# addition, users can compare the output from the record and replay stages 
+# and run timing analysis to find the overheard incurred from instrumentation.
+#
+# Authors: Christina Fosheim-Hoag, Oliver Miles, and Sabrina Brogren
+
+
+# Stop on errors, print commands
+# See https://vaneyckt.io/posts/safer_bash_scripts_with_set_euxo_pipefail/
+set -Eeuo pipefail
+
+################################  VARIABLES  ##################################
+
+RR_DIR=/home/omiles/582/record_and_replay
+
+EXECUTABLE=
+OPTION=
+ARG_LIST=()
+ARGS=
+VOLUME=0
+
+
+##############################  FUNCTIONS  #####################################
+
+error() {
+    printf 'USAGE: gplayu EXEC [OPTIONS] [FLAGS]\n'
+    printf 'Try gplayu --help for full usage message.\n'
+}
+
+# Print usage message
+usage() {
+    printf 'USAGE: gplayu EXEC [OPTIONS] [FLAGS]\n'
+    printf '\n'
+    printf 'Run GPlayU software. By default, all phases are run.\n'
+    printf 'Run with executable, up to 1 option, and multiple flags\n'
+    printf '\n'
+    printf 'Arguments:\n'
+    printf '       EXEC                    path to the executable to record and replay\n'
+    printf 'Options:\n'
+    printf '       -r1, --record           only run the record phase\n'
+    printf '        -f, --filter           only run the data cleaning phase\n'
+    printf '       -r2, --replay           only run the replay phase\n'
+    printf '        -c, --check-output     save and compare output from record and replay\n'
+    printf '        -t, --time             times EXEC with and without instrumentation\n'
+    printf '        -h, --help             display usage message\n'
+    printf '\n'
+    printf 'Flags:\n'
+    printf '        -a, --args ARG1        arguments to be passed to the executable\n'
+    printf '        -v1, --verbose1         print output 1 is memory\n'
+    printf '        -v2, --verbose2        print output 2 is all\n'
+    printf '\n'
+    printf 'RUN setup.sh to disable ASLR if you care\n'
+}
+
+# Renames files from record or replay
+# Usage: rename PHASE RESULT_VARIABLE
+# Ex. rename "record" "$RESULT"
+rename() {
+    RENAMED=()
+    while IFS= read -r line; do
+        case $line in 
+            *\ * ) 
+                FILENAME="$(echo "$line" | cut -d " " -f2 | cut -d "." -f1)"
+                EXTENSION="$(echo "$line" | cut -d " " -f2 | cut -d "." -f2)"
+                printf "Renaming $FILENAME.$EXTENSION to $1-$FILENAME.$EXTENSION\n"
+                mv "$FILENAME.$EXTENSION" "$1-$FILENAME.$EXTENSION"
+                RENAMED+=( "$1-$FILENAME.$EXTENSION" )
+                ;; 
+            *) 
+                continue
+                ;; 
+        esac
+    done <<< "$2"
+}
+
+# Run record phase, optionally saving output to a file
+record() {
+    printf 'Recording..........\n'
+    if [ "$OPTION" = "check" ]; then
+        touch $CURRENT_DIR/record_out
+        touch $CURRENT_DIR/replay_out
+    fi
+
+    rm -rf record_output
+    mkdir record_output
+    DIR_BEFORE="$(ls $CURRENT_DIR)"
+
+    export LD_PRELOAD=$RR_DIR/output/record_and_replay.so
+    if [ "$OPTION" = "check" ]; then
+        RECORD_REPLAY_PHASE=0 NOBANNER=1 TOOL_VERBOSE=$VOLUME $EXECUTABLE "${ARG_LIST[@]}" > $CURRENT_DIR/record_out
+    else
+        RECORD_REPLAY_PHASE=0 NOBANNER=1 TOOL_VERBOSE=$VOLUME $EXECUTABLE "${ARG_LIST[@]}"
+    fi
+    export LD_PRELOAD=
+
+    DIR_AFTER="$(ls $CURRENT_DIR)"
+    if ! RESULT="$(diff  <(echo "$DIR_BEFORE" ) <(echo "$DIR_AFTER"))"; then 
+        rename "record" "$RESULT"
+        RECORD_RENAMED=$RENAMED
+    fi
+
+    printf 'Recording complete!\n\n\n'
+}
+
+# Run filtering phase
+filter() {
+    printf 'Filtering data..........\n'
+    rm -rf dependency_output
+    mkdir dependency_output
+
+    if [ ! -d $CURRENT_DIR/record_output ]; then
+        printf "Record output not found.\n"
+        printf "Run the full script or the record phase to create the output."
+        exit 1
+    fi
+
+    for file in $CURRENT_DIR/record_output/*.record; do
+        $RR_DIR/detector $file &
+        echo "Started checking $file with PID $!"
+    done
+    wait
+    printf 'Filtering complete!\n\n\n'
+}
+
+# Run replay phase, optionally saving output to a file
+replay() {
+    printf 'Replaying...........\n'
+
+    if [ ! -d $CURRENT_DIR/dependency_output ]; then
+        printf "Dependency output not found.\n"
+        printf "Run the full script or the record and filter phases to create the output."
+        exit 1
+    fi
+
+    DIR_BEFORE="$(ls $CURRENT_DIR)"
+
+    export LD_PRELOAD=$RR_DIR/output/record_and_replay.so
+    if [ "$OPTION" = "check" ]; then
+        RECORD_REPLAY_PHASE=1 NOBANNER=1 TOOL_VERBOSE=$VOLUME $EXECUTABLE "${ARG_LIST[@]}" > $CURRENT_DIR/replay_out
+    else
+        RECORD_REPLAY_PHASE=1 NOBANNER=1 TOOL_VERBOSE=$VOLUME $EXECUTABLE "${ARG_LIST[@]}"
+    fi
+    export LD_PRELOAD=
+
+    DIR_AFTER="$(ls $CURRENT_DIR)"
+    if ! RESULT="$(diff  <(echo "$DIR_BEFORE" ) <(echo "$DIR_AFTER"))"; then 
+        rename "replay" "$RESULT"
+        REPLAY_RENAMED=$RENAMED
+    fi
+
+    printf 'Replaying complete!\n\n\n'
+}
+
+# Runs the record, filter, and replay phases in order
+full_run() {
+    record
+    filter
+    replay
+}
+
+# Check output from record and replay phases for differences
+check() {
+    tail -n +6 $CURRENT_DIR/record_out > record_out
+    tail -n +6 $CURRENT_DIR/replay_out > replay_out
+
+    # Diff the output, see if it is the same
+    printf "Checking the standard output...\n"
+    if diff $CURRENT_DIR/record_out $CURRENT_DIR/replay_out; then
+        rm $CURRENT_DIR/record_out $CURRENT_DIR/replay_out
+    else 
+        printf "There are differences in the standard output!\n"
+        exit 1
+    fi
+
+    # If there were output files, thenn check them too 
+    printf "Checking the output files, if there are any...\n"
+    for idx in "${!RECORD_RENAMED[@]}"; do 
+        printf "    ${RECORD_RENAMED[$idx]} vs ${REPLAY_RENAMED[$idx]}\n"
+        if ! diff ${RECORD_RENAMED[$idx]} ${REPLAY_RENAMED[$idx]}; then
+            printf "There is a difference between ${RECORD_RENAMED[$idx]} and ${REPLAY_RENAMED[$idx]}\n"
+            exit 1
+        fi
+    done
+
+    printf "\nThere are no differences!\n"
+}
+
+# Check output from record and replay phases for differences
+time_runs() {
+    # Time both runs
+    printf "Timing Original Executable...\n"
+    { time $EXECUTABLE "${ARG_LIST[@]}" ; } 2> orig_time
+    printf "Finished!\n\n\n"
+
+    printf "Timing Instrumented Executable...\n"
+    { time full_run ; } 2> instr_time
+    printf "Finished!\n\n\n"
+
+    # Print the results of timing
+    printf "Runtime without instrumentation:\n"
+    tail -3 orig_time
+
+    printf "\n"
+
+    printf "Runtime with instrumentation:\n"
+    tail -3 instr_time
+
+    printf "\n"
+
+    printf "Percent Overhead:\n"
+    TimeCategorites=( "real" "user" "sys" )
+    for time_cat in "${TimeCategorites[@]}"; do
+        ORIG_MINUTES="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f1)"
+        ORIG_SECONDS="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
+        ORIG_TOTAL=$(awk "BEGIN {print $ORIG_MINUTES*60 + $ORIG_SECONDS; exit}")
+
+        INSTR_MINUTES="$(grep "$time_cat" instr_time | cut  -f2 | cut -d "m" -f1)"
+        INSTR_SECONDS="$(grep "$time_cat" instr_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
+        INSTR_TOTAL=$(awk "BEGIN {print $INSTR_MINUTES*60 + $INSTR_SECONDS; exit}")
+
+        OVERHEAD=$(awk "BEGIN {print (($INSTR_TOTAL - $ORIG_TOTAL) / $ORIG_TOTAL) * 100; exit}")
+        printf "$time_cat\t$OVERHEAD%%\n"
+    done
+
+    rm orig_time instr_time
+}
+
+# Check if too many options are being specified 
+check_flag() {
+    if [ -n "$OPTION" ]; then
+        printf "Too many options specified\n\n"
+        error
+        exit 1
+    fi
+
+    if [ -n "$ARGS" ]; then
+        ARGS=
+    fi
+}
+
+#################################  MAIN  ######################################
+
+# Check for executable
+if [ "$#" -eq 0 ]; then
+    printf "No executable provided\n\n"
+    error
+    exit 1
+fi
+
+CURRENT_DIR="$( pwd )"
+# Read in command line arguments arguments
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -r1|--record)
+        check_flag
+        OPTION="record"
+        shift 
+        ;;
+    -fl|--filter)
+        check_flag
+        OPTION="filter"
+        shift 
+        ;;
+    -r2|--replay)
+        check_flag
+        OPTION="replay"
+        shift 
+        ;;
+    -c|--check-output)
+        check_flag
+        OPTION="check"
+        shift 
+        ;;
+    -t|--time)
+        check_flag
+        OPTION="time"
+        shift 
+        ;;
+    -a|--args)
+        ARGS="true"
+        shift 
+        ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    -v1|--verbose1)
+        VOLUME=1
+        shift
+        ;;
+    -v2|--verbose2)
+        VOLUME=2
+        shift
+        ;;
+    *) 
+        if [ -n "$ARGS" ]; then
+            ARG_LIST+=( "$1" ) 
+            shift
+        elif [ -z "$EXECUTABLE" ]; then
+            EXECUTABLE=$CURRENT_DIR/$1
+            shift
+        else
+            printf "Unknown argument $1\n\n"
+            error
+            exit 1
+        fi
+        ;;
+esac
+done
+
+
+# Set values needed for running instrumentation
+export CUDA_VISIBLE_DEVICES=1
+
+
+if [ ! -f $EXECUTABLE ]; then
+    printf "No executable found at $EXECUTABLE\n"
+    exit 1 
+fi
+
+# Run action specified by options
+case "$OPTION" in
+    record)
+        record 
+        ;;
+    filter)
+        filter 
+        ;;
+    replay)
+        replay 
+        ;;
+    check)
+        full_run
+        check 
+        ;;
+    time)
+        time_runs
+        ;;
+    *)
+        full_run
+        ;;
+esac
