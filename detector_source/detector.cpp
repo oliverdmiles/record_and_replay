@@ -66,24 +66,7 @@ void read_file(string filename) {
 		acc->load = (op == "L");
 		acc->shared = (type == "S");
 
-		if (acc->load) {
-			thread_pairs[acc->thread_id].insert(acc);
-		} else {
-			accs[acc->address].insert(acc);
-		}
-
-	}
-
-	for (auto map_it = thread_pairs.begin(); map_it != thread_pairs.end(); map_it++) {
-		for (auto it = map_it->second.begin(); it != map_it->second.end(); it++) {
-			Access* temp = *it;
-			it++;
-			Access* just_value = *it;
-
-			temp->value = just_value->value;
-			accs[temp->address].insert(temp);
-		}
-		map_it->second.clear();
+		accs[acc->address].insert(acc);
 	}
 
 	return;

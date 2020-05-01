@@ -79,7 +79,7 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         printf("^ size is %d\n", instr->getSize());
       }
       /* Instrument loads before and after. Instrument stores before. */
-      for (int i = 0; i < 2; ++i) {
+      for (int i = 0; i < 1; ++i) {
         uint32_t op_type = 0;
         /* 00 is shared store
          * 01 is shared load
@@ -128,7 +128,7 @@ void addRecordInstrumentation(CUcontext &ctx, CUfunction &f) {
         nvbit_add_call_arg_const_val32(instr, (int)op1->value[0]);
         /* immediate */
         nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
-        nvbit_add_call_arg_const_val32(instr, cnt);
+        nvbit_remove_orig(instr);
       }
     }
     cnt++;
@@ -167,7 +167,7 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
         size = 8;
       else 
         size = instr->getSize();
-      uint32_t op_info = (instr->isExtended() << 4) | size;
+      uint32_t op_info = (instr->isLoad() << 4) | size;
       nvbit_add_call_arg_const_val32(instr, op_info);
 
       const Instr::operand_t *op0 = instr->getOperand(0);
@@ -193,6 +193,8 @@ void addReplayInstrumentation(CUcontext &ctx, CUfunction &f) {
       /* immediate */
       nvbit_add_call_arg_const_val32(instr, (int)op0->value[1]);
       nvbit_add_call_arg_const_val32(instr, cnt);
+
+      nvbit_remove_orig(instr);
     }
     cnt++;
   }
@@ -277,25 +279,23 @@ void handleReplayKernelEvent(CUcontext &ctx, int is_exit, const char *name,
     for (uint64_t i = 0; i < numDependecies; ++i) {
       uint64_t addr, num_threads;
       fscanf(fptr, "%lx %lu", &addr, &num_threads);
-      uint64_t numSpots = 3 * num_threads + NUM_METADATA;
+      uint64_t numSpots = 2 * num_threads + NUM_METADATA;
       uint64_t *subArray = new uint64_t[numSpots];
       subArray[0] = addr;
-      subArray[1] = num_threads;
-      subArray[2] = 0;
+      subArray[1] = 0;
 
       uint64_t curr_thread;
       char load_or_store;
       uint64_t value;
-      for (uint64_t j = 0; j < 3 * num_threads; j += 3) {
+      for (uint64_t j = 0; j < 2 * num_threads; j += 2) {
         fscanf(fptr, "%lu %s %lx", &curr_thread, &load_or_store, &value);
-        subArray[NUM_METADATA + j] = curr_thread;
-        if (load_or_store == 'L') {
-          subArray[NUM_METADATA + j + 1] = 1;
-        } else {
-          subArray[NUM_METADATA + j + 1] = 0;
+      #ifdef MULTILOCK
+        if (j == 0) {
+          subArray[1] = curr_thread << 32;
         }
-
-        subArray[NUM_METADATA + j + 2] = value;
+      #endif
+        subArray[NUM_METADATA + j] = curr_thread;
+        subArray[NUM_METADATA + j + 1] = value;
       }
 
       CUDA_SAFECALL(

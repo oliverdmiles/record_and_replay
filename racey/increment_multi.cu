@@ -29,7 +29,7 @@ __global__ void atomic_kernel(char *temp, short test) {
 }
 
 int main() {
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i < 16; ++i) {
     printf("Before running kernel %d:\n", i);
     printf("    x: %llx\n", x);
     printf("    y: %llx\n", y);

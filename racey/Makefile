@@ -18,7 +18,7 @@ else
 	NVCC_FLAGS += -O2
 endif
 
-OBJS=atomic_increment increment base_with_syncthreads dynamic_parallelism flag_sync_across_blocks single_stream  warp_lock base branch_race dynamic_parallelism_with_streams implicit_intra_warp_sync memcpy_async two_streams increment_multi increment_large
+OBJS=mega atomic_increment increment base_with_syncthreads dynamic_parallelism flag_sync_across_blocks single_stream  warp_lock base branch_race dynamic_parallelism_with_streams implicit_intra_warp_sync memcpy_async two_streams increment_multi increment_large increment_copy_to_device
 
 all: $(OBJS)
 

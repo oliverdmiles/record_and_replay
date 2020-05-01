@@ -17,7 +17,7 @@ set -Eeuo pipefail
 
 ################################  VARIABLES  ##################################
 
-RR_DIR=/home/omiles/582/record_and_replay
+RR_DIR=/home/omiles/582/omiles/record_and_replay
 
 EXECUTABLE=
 OPTION=
@@ -44,7 +44,7 @@ usage() {
     printf '       EXEC                    path to the executable to record and replay\n'
     printf 'Options:\n'
     printf '       -r1, --record           only run the record phase\n'
-    printf '        -f, --filter           only run the data cleaning phase\n'
+    printf '       -fl, --filter           only run the data cleaning phase\n'
     printf '       -r2, --replay           only run the replay phase\n'
     printf '        -c, --check-output     save and compare output from record and replay\n'
     printf '        -t, --time             times EXEC with and without instrumentation\n'
@@ -166,15 +166,14 @@ full_run() {
 
 # Check output from record and replay phases for differences
 check() {
-    tail -n +6 $CURRENT_DIR/record_out > record_out
-    tail -n +6 $CURRENT_DIR/replay_out > replay_out
+    tail -n +6 $CURRENT_DIR/record_out > $CURRENT_DIR/trimmed_record_out
+    tail -n +6 $CURRENT_DIR/replay_out > $CURRENT_DIR/trimmed_replay_out
+    rm $CURRENT_DIR/record_out $CURRENT_DIR/replay_out
 
     # Diff the output, see if it is the same
     printf "Checking the standard output...\n"
-    if diff $CURRENT_DIR/record_out $CURRENT_DIR/replay_out; then
-        rm $CURRENT_DIR/record_out $CURRENT_DIR/replay_out
-    else 
-        printf "There are differences in the standard output!\n"
+    if ! diff $CURRENT_DIR/trimmed_record_out $CURRENT_DIR/trimmed_replay_out; then
+        printf "There is a difference in the standard output!\n"
         exit 1
     fi
 
@@ -199,36 +198,50 @@ time_runs() {
     printf "Finished!\n\n\n"
 
     printf "Timing Instrumented Executable...\n"
-    { time full_run ; } 2> instr_time
+    { time record ; } 2> record_time
+    { time filter ; } 2> filter_time
+    { time replay ; } 2> replay_time
     printf "Finished!\n\n\n"
 
     # Print the results of timing
     printf "Runtime without instrumentation:\n"
     tail -3 orig_time
-
     printf "\n"
 
-    printf "Runtime with instrumentation:\n"
-    tail -3 instr_time
-
+    printf "Runtime for record:\n"
+    tail -3 record_time
     printf "\n"
 
-    printf "Percent Overhead:\n"
+    printf "Runtime for filter:\n"
+    tail -3 filter_time
+    printf "\n"
+
+    printf "Runtime for replay:\n"
+    tail -3 replay_time
+    printf "\n"
+
     TimeCategorites=( "real" "user" "sys" )
-    for time_cat in "${TimeCategorites[@]}"; do
-        ORIG_MINUTES="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f1)"
-        ORIG_SECONDS="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
-        ORIG_TOTAL=$(awk "BEGIN {print $ORIG_MINUTES*60 + $ORIG_SECONDS; exit}")
+    Files=( "record" "replay" )
+    for file in "${Files[@]}"; do
+        printf "Percent overhead for $file:\n"
+        echo "$file overhead:\n" >> out
+        for time_cat in "${TimeCategorites[@]}"; do
+            ORIG_MINUTES="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f1)"
+            ORIG_SECONDS="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
+            ORIG_TOTAL=$(awk "BEGIN {print $ORIG_MINUTES*60 + $ORIG_SECONDS; exit}")
 
-        INSTR_MINUTES="$(grep "$time_cat" instr_time | cut  -f2 | cut -d "m" -f1)"
-        INSTR_SECONDS="$(grep "$time_cat" instr_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
-        INSTR_TOTAL=$(awk "BEGIN {print $INSTR_MINUTES*60 + $INSTR_SECONDS; exit}")
+            NEW_MINUTES="$(grep "$time_cat" "$file"_time | cut  -f2 | cut -d "m" -f1)"
+            NEW_SECONDS="$(grep "$time_cat" "$file"_time  | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
+            NEW_TOTAL=$(awk "BEGIN {print $NEW_MINUTES*60 + $NEW_SECONDS; exit}")
 
-        OVERHEAD=$(awk "BEGIN {print (($INSTR_TOTAL - $ORIG_TOTAL) / $ORIG_TOTAL) * 100; exit}")
-        printf "$time_cat\t$OVERHEAD%%\n"
+            OVERHEAD=$(awk "BEGIN {print (($NEW_TOTAL - $ORIG_TOTAL) / $ORIG_TOTAL) * 100; exit}")
+            printf "$time_cat\t$OVERHEAD%%\n"
+            echo "$time_cat\t$OVERHEAD%%\n" >> out
+        done
+        printf "\n"
     done
 
-    rm orig_time instr_time
+    rm orig_time record_time filter_time replay_time
 }
 
 # Check if too many options are being specified 

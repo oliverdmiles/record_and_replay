@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define MULTILOCK
+
 /* Channel used to communicate from GPU to CPU receiving thread */
 #define CHANNEL_SIZE (1l << 30)
 static __managed__ ChannelDev channel_dev;
@@ -59,7 +61,7 @@ std::map<uint64_t, int> replay_files;
  * slot 0: address with data race
  * slot 1: number of threads participating in data race
  * slot 2: index of next thread to execute */
-__managed__ int NUM_METADATA = 3;
+__managed__ int NUM_METADATA = 2;
 
 /* array on the device used to replay data races. Format is as follows:
  * slots 0-2: metadata. See above
