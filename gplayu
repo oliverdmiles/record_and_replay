@@ -224,7 +224,6 @@ time_runs() {
     Files=( "record" "replay" )
     for file in "${Files[@]}"; do
         printf "Percent overhead for $file:\n"
-        echo "$file overhead:\n" >> out
         for time_cat in "${TimeCategorites[@]}"; do
             ORIG_MINUTES="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f1)"
             ORIG_SECONDS="$(grep "$time_cat" orig_time | cut  -f2 | cut -d "m" -f2 | sed 's/s$//')"
@@ -236,7 +235,6 @@ time_runs() {
 
             OVERHEAD=$(awk "BEGIN {print (($NEW_TOTAL - $ORIG_TOTAL) / $ORIG_TOTAL) * 100; exit}")
             printf "$time_cat\t$OVERHEAD%%\n"
-            echo "$time_cat\t$OVERHEAD%%\n" >> out
         done
         printf "\n"
     done
